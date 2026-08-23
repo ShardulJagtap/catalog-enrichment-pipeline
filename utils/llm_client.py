@@ -482,7 +482,7 @@ def generate_description(product_name: str, attributes: Dict[str, Any]) -> str:
         f"Known attributes:\n{attr_lines if attr_lines else '  (none provided)'}"
     )
 
-    result = _client.chat(system, user, temperature=0.65, max_tokens=300)  # description: capped
+    result = _client.chat(system, user, temperature=0.65, max_tokens=120)  # ~50-60 words is enough
 
     if not result or _is_refusal(result):
         logger.debug("Description refusal/empty for '%s' — using mock", safe_name)

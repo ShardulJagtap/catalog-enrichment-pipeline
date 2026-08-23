@@ -249,6 +249,50 @@ async def job_status(job_id: str):
     )
 
 
+@app.get("/api/status/{job_id}/stream")
+async def job_status_stream(job_id: str):
+    """
+    Server-Sent Events stream for real-time job progress.
+    The browser EventSource API consumes this — no polling needed.
+    """
+    from fastapi.responses import StreamingResponse
+    import asyncio
+
+    async def event_generator():
+        last_progress = ""
+        while True:
+            with _jobs_lock:
+                job = _jobs.get(job_id)
+            if not job:
+                yield f"data: {json.dumps({'error': 'not found'})}\n\n"
+                break
+
+            current = job.get("progress", "")
+            status  = job.get("status", "queued")
+
+            if current != last_progress:
+                payload = {
+                    "status":            status,
+                    "progress":          current,
+                    "total_skus":        job.get("total_skus"),
+                    "avg_quality_score": job.get("avg_quality_score"),
+                    "error":             job.get("error"),
+                }
+                yield f"data: {json.dumps(payload)}\n\n"
+                last_progress = current
+
+            if status in ("complete", "failed"):
+                break
+
+            await asyncio.sleep(0.8)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
+
+
 @app.get("/api/results/{job_id}")
 async def job_results(job_id: str, limit: int = 100, offset: int = 0):
     """Return the enriched catalog for a completed job (paginated)."""

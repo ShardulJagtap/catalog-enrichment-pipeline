@@ -26,9 +26,9 @@ from models.product import EnrichedProduct
 from utils.helpers import word_count
 from utils.llm_client import generate_description, generate_seo_tags, MIN_DESC_WORDS
 
-# Max concurrent Ollama calls — higher = faster, but risks OOM on small machines.
-# 4 is safe for llama3.2 on 8–16GB RAM; reduce to 2 on tighter hardware.
-MAX_WORKERS = 4
+# Max concurrent Ollama calls — 6 is safe for llama3.2 on 8GB+ RAM.
+# Reduce to 3 on machines with <8GB.
+MAX_WORKERS = 6
 
 
 class DescriptionGenerationAgent(BaseAgent):

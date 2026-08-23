@@ -1,499 +1,296 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Catalog Enrichment Pipeline</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
   <style>
-    /* ── Design tokens ──────────────────────────────────────────────── */
-    :root {
-      --bg:         #F7F6F3;       /* warm off-white */
-      --surface:    #FFFFFF;
-      --surface2:   #F0EEE9;       /* warm light grey */
-      --border:     #E4E1DA;
-      --border2:    #D0CCBF;
+    /* ── Tokens ── */
+    :root{
+      --bg:#F8F7F4; --surface:#FFF; --surface2:#F2F0EC; --border:#E6E3DC; --border2:#CCC9BF;
+      --text:#1A1816; --text2:#5C5750; --text3:#A09C94;
+      --indigo:#4F46E5; --indigo-lt:#EEEFFE; --indigo-dk:#3730A3;
+      --teal:#0D9488; --teal-lt:#F0FDFA;
+      --amber:#D97706; --amber-lt:#FFFBEB;
+      --rose:#E11D48; --rose-lt:#FFF1F2;
+      --green:#16A34A; --green-lt:#F0FDF4;
+      --r:10px; --r-lg:14px;
+      --sh:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+      --sh-md:0 4px 14px rgba(0,0,0,.08);
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html{scroll-behavior:smooth}
+    body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:14px;line-height:1.5;min-height:100vh}
+    a{color:var(--indigo);text-decoration:none}
+    code{font-family:'SF Mono','Fira Code',monospace;font-size:.85em}
 
-      --text:       #1C1917;       /* warm near-black */
-      --text2:      #57534E;       /* warm medium grey */
-      --text3:      #A8A29E;       /* warm light grey */
+    /* ── Topbar ── */
+    .topbar{position:sticky;top:0;z-index:100;background:var(--surface);border-bottom:1px solid var(--border);box-shadow:var(--sh);height:56px;display:flex;align-items:center;padding:0 24px;gap:12px}
+    .logo{display:flex;align-items:center;gap:9px;font-weight:700;font-size:15px}
+    .logo-icon{width:30px;height:30px;border-radius:8px;background:linear-gradient(135deg,var(--indigo),#7C3AED);display:flex;align-items:center;justify-content:center;font-size:15px}
+    .logo-sub{font-weight:400;color:var(--text3);font-size:13px;margin-left:3px}
+    .topbar-space{flex:1}
+    .nav-link{padding:6px 11px;border-radius:6px;font-size:13px;color:var(--text2);transition:background .15s,color .15s}
+    .nav-link:hover{background:var(--surface2);color:var(--text);text-decoration:none}
+    .status-pill{display:flex;align-items:center;gap:6px;padding:5px 12px;border-radius:20px;border:1px solid var(--border);background:var(--surface2);font-size:12px;font-weight:500;color:var(--text2)}
+    .pip{width:7px;height:7px;border-radius:50%;background:var(--text3);flex-shrink:0}
+    .pip.live{background:var(--teal);box-shadow:0 0 0 3px rgba(13,148,136,.15)}
+    .pip.dead{background:var(--rose)}
 
-      --indigo:     #4F46E5;       /* primary action */
-      --indigo-lt:  #EEF2FF;
-      --indigo-dk:  #3730A3;
+    /* ── Layout ── */
+    .page{max-width:1320px;margin:0 auto;padding:24px 20px}
+    .layout{display:grid;grid-template-columns:320px 1fr;gap:18px;align-items:start}
+    @media(max-width:940px){.layout{grid-template-columns:1fr}}
 
-      --teal:       #0D9488;       /* positive / success */
-      --teal-lt:    #F0FDFA;
+    /* ── Card ── */
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--sh);padding:20px}
+    .card+.card{margin-top:14px}
+    .card-hd{display:flex;align-items:center;gap:7px;font-size:13px;font-weight:600;margin-bottom:14px;color:var(--text)}
+    .card-hd .icon{font-size:15px}
 
-      --amber:      #D97706;       /* warning */
-      --amber-lt:   #FFFBEB;
+    /* ── Buttons ── */
+    .btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:8px 16px;border-radius:7px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all .15s;white-space:nowrap}
+    .btn:active{transform:scale(.98)}
+    .btn-primary{background:var(--indigo);color:#fff;box-shadow:0 2px 8px rgba(79,70,229,.3)}
+    .btn-primary:hover{background:var(--indigo-dk);box-shadow:0 4px 12px rgba(79,70,229,.4)}
+    .btn-primary:disabled{background:var(--border2);color:var(--text3);box-shadow:none;cursor:not-allowed;transform:none}
+    .btn-outline{background:var(--surface);border:1px solid var(--border2);color:var(--text2)}
+    .btn-outline:hover{background:var(--surface2);color:var(--text)}
+    .btn-ghost{background:transparent;color:var(--text2)}
+    .btn-ghost:hover{background:var(--surface2);color:var(--text)}
+    .btn-approve{background:var(--green-lt);color:var(--green);border:1px solid #bbf7d0}
+    .btn-approve:hover{background:#dcfce7}
+    .btn-reject{background:var(--rose-lt);color:var(--rose);border:1px solid #fecdd3}
+    .btn-reject:hover{background:#ffe4e6}
+    .btn-sm{padding:5px 11px;font-size:12px}
+    .btn-full{width:100%}
 
-      --rose:       #E11D48;       /* danger */
-      --rose-lt:    #FFF1F2;
+    /* ── Form ── */
+    .field{margin-bottom:13px}
+    .field label{display:block;font-size:12px;font-weight:500;color:var(--text2);margin-bottom:5px}
+    .toggle-row{display:flex;align-items:center;justify-content:space-between;gap:12px}
+    .toggle-row .lb strong{font-size:13px;color:var(--text);font-weight:500}
+    .toggle-row .lb small{display:block;font-size:11px;color:var(--text3);margin-top:1px}
+    .sw{position:relative;width:38px;height:22px;flex-shrink:0}
+    .sw input{opacity:0;width:0;height:0;position:absolute}
+    .sw-track{position:absolute;inset:0;background:var(--border2);border-radius:11px;cursor:pointer;transition:background .2s}
+    .sw-track:before{content:'';position:absolute;width:16px;height:16px;border-radius:50%;background:#fff;top:3px;left:3px;box-shadow:0 1px 3px rgba(0,0,0,.2);transition:transform .2s}
+    .sw input:checked+.sw-track{background:var(--indigo)}
+    .sw input:checked+.sw-track:before{transform:translateX(16px)}
 
-      --slate:      #64748B;
-      --green:      #16A34A;
-      --green-lt:   #F0FDF4;
+    /* ── File chips ── */
+    .file-chips{display:flex;flex-direction:column;gap:5px}
+    .fc{display:flex;align-items:center;gap:8px;padding:7px 11px;border-radius:7px;background:var(--surface2);border:1px solid var(--border);font-size:12px;color:var(--text2)}
+    .fc-ic{width:24px;height:24px;border-radius:5px;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+    .fc-csv{background:#D1FAE5;color:#065F46}.fc-json{background:#DBEAFE;color:#1E3A8A}.fc-txt{background:#FEF3C7;color:#92400E}.fc-xml{background:#FCE7F3;color:#831843}.fc-def{background:var(--border);color:var(--text2)}
+    .fc-name{font-weight:500;flex:1}
+    .fc-tag{font-size:10px;color:var(--text3);background:var(--border);padding:1px 5px;border-radius:3px}
 
-      --radius-sm:  6px;
-      --radius:     10px;
-      --radius-lg:  16px;
+    /* ── Drop zone ── */
+    .dz{border:2px dashed var(--border2);border-radius:var(--r);padding:16px;text-align:center;cursor:pointer;color:var(--text3);font-size:12px;transition:all .15s}
+    .dz:hover{border-color:var(--indigo);background:var(--indigo-lt);color:var(--indigo)}
+    .dz-icon{font-size:20px;margin-bottom:5px}
+    .dz-lbl{font-weight:500}
 
-      --shadow-sm:  0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-      --shadow:     0 4px 12px rgba(0,0,0,.08), 0 2px 4px rgba(0,0,0,.04);
-      --shadow-lg:  0 10px 30px rgba(0,0,0,.10), 0 4px 8px rgba(0,0,0,.05);
-    }
+    /* ── Progress ── */
+    .prog-sec{margin-top:14px}
+    .prog-head{display:flex;justify-content:space-between;font-size:12px;color:var(--text2);margin-bottom:6px}
+    .prog-dots{display:flex;gap:3px;margin-bottom:7px}
+    .pd{flex:1;height:4px;border-radius:2px;background:var(--border);transition:background .3s}
+    .pd.done{background:var(--indigo)}.pd.active{background:#818CF8}
+    .prog-bar-bg{height:5px;background:var(--surface2);border-radius:5px;overflow:hidden}
+    .prog-bar{height:100%;background:linear-gradient(90deg,var(--indigo),#7C3AED);border-radius:5px;transition:width .5s cubic-bezier(.4,0,.2,1)}
 
-    /* ── Reset & base ───────────────────────────────────────────────── */
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html { scroll-behavior: smooth; }
-    body {
-      font-family: 'Inter', system-ui, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      font-size: 14px;
-      line-height: 1.5;
-      min-height: 100vh;
-    }
-    a { color: var(--indigo); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-    code { font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.85em; }
+    /* ── Job history ── */
+    .job-item{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px}
+    .job-item:last-child{border-bottom:none}
+    .ji-id{font-family:monospace;color:var(--text3);flex-shrink:0;font-size:11px}
+    .ji-meta{flex:1;color:var(--text2)}
 
-    /* ── Topbar ─────────────────────────────────────────────────────── */
-    .topbar {
-      position: sticky; top: 0; z-index: 100;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      box-shadow: var(--shadow-sm);
-      height: 58px;
-      display: flex; align-items: center;
-      padding: 0 28px;
-      gap: 12px;
-    }
-    .topbar-logo {
-      display: flex; align-items: center; gap: 10px;
-      font-weight: 700; font-size: 15px; color: var(--text);
-    }
-    .topbar-logo .icon-wrap {
-      width: 32px; height: 32px; border-radius: 8px;
-      background: linear-gradient(135deg, var(--indigo), #7C3AED);
-      display: flex; align-items: center; justify-content: center;
-      font-size: 16px;
-    }
-    .topbar-logo .sub { font-weight: 400; color: var(--text3); font-size: 13px; margin-left: 4px; }
-    .topbar-spacer { flex: 1; }
-    .topbar-links { display: flex; align-items: center; gap: 4px; }
-    .topbar-links a {
-      padding: 6px 12px; border-radius: var(--radius-sm);
-      font-size: 13px; color: var(--text2);
-      transition: background 0.15s, color 0.15s;
-    }
-    .topbar-links a:hover { background: var(--surface2); color: var(--text); text-decoration: none; }
-    .status-pill {
-      display: flex; align-items: center; gap: 7px;
-      padding: 5px 12px; border-radius: 20px;
-      border: 1px solid var(--border); background: var(--surface2);
-      font-size: 12px; font-weight: 500; color: var(--text2);
-    }
-    .status-pill .pip {
-      width: 7px; height: 7px; border-radius: 50%;
-      background: var(--text3); flex-shrink: 0;
-    }
-    .status-pill .pip.live { background: var(--teal); box-shadow: 0 0 0 3px rgba(13,148,136,.15); }
-    .status-pill .pip.dead { background: var(--rose); }
+    /* ── Status badges ── */
+    .sb{display:inline-block;padding:2px 8px;border-radius:4px;font-size:11px;font-weight:600;flex-shrink:0}
+    .sb-queued{background:var(--surface2);color:var(--text3)}
+    .sb-running{background:#DBEAFE;color:#1D4ED8}
+    .sb-complete{background:var(--green-lt);color:var(--green)}
+    .sb-failed{background:var(--rose-lt);color:var(--rose)}
 
-    /* ── Layout ─────────────────────────────────────────────────────── */
-    .page { max-width: 1280px; margin: 0 auto; padding: 28px 24px; }
-    .two-col { display: grid; grid-template-columns: 340px 1fr; gap: 20px; align-items: start; }
-    @media (max-width: 960px) { .two-col { grid-template-columns: 1fr; } }
+    /* ── Stats grid ── */
+    .stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:18px}
+    @media(max-width:700px){.stats-grid{grid-template-columns:repeat(2,1fr)}}
+    .st{background:var(--surface);border:1px solid var(--border);border-radius:var(--r);padding:13px 15px}
+    .st-val{font-size:24px;font-weight:700;line-height:1}
+    .st-val.c-teal{color:var(--teal)}.st-val.c-amber{color:var(--amber)}.st-val.c-rose{color:var(--rose)}.st-val.c-indigo{color:var(--indigo)}
+    .st-lbl{font-size:11px;color:var(--text3);margin-top:3px;font-weight:500}
 
-    /* ── Section heading ────────────────────────────────────────────── */
-    .section-title {
-      font-size: 11px; font-weight: 600; text-transform: uppercase;
-      letter-spacing: .8px; color: var(--text3); margin-bottom: 12px;
-    }
+    /* ── Tabs ── */
+    .tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:16px}
+    .tab{padding:8px 15px;font-size:13px;font-weight:500;color:var(--text3);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;transition:color .15s;white-space:nowrap}
+    .tab:hover{color:var(--text2)}
+    .tab.on{color:var(--indigo);border-bottom-color:var(--indigo)}
 
-    /* ── Card ───────────────────────────────────────────────────────── */
-    .card {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      box-shadow: var(--shadow-sm);
-      padding: 22px;
+    /* ── Chart section ── */
+    .chart-section{
+      display:grid;
+      grid-template-columns:repeat(3,1fr);
+      gap:12px;
+      margin-bottom:12px;
     }
-    .card + .card { margin-top: 16px; }
-    .card-title {
-      font-size: 13px; font-weight: 600; color: var(--text);
-      margin-bottom: 16px; display: flex; align-items: center; gap: 8px;
-    }
-    .card-title .icon { font-size: 16px; }
+    @media(max-width:1000px){.chart-section{grid-template-columns:repeat(2,1fr)}}
+    @media(max-width:600px) {.chart-section{grid-template-columns:1fr}}
 
-    /* ── Buttons ─────────────────────────────────────────────────────── */
-    .btn {
-      display: inline-flex; align-items: center; justify-content: center; gap: 7px;
-      padding: 9px 18px; border-radius: var(--radius-sm);
-      font-size: 13px; font-weight: 600; border: none; cursor: pointer;
-      transition: background 0.15s, box-shadow 0.15s, transform 0.1s;
-      white-space: nowrap;
+    .chart-card{
+      background:var(--surface2);
+      border:1px solid var(--border);
+      border-radius:var(--r);
+      padding:12px 14px;
+      /* Prevent the card itself from growing with its content */
+      min-width:0;
     }
-    .btn:active { transform: scale(0.98); }
-    .btn-primary {
-      background: var(--indigo); color: #fff;
-      box-shadow: 0 2px 8px rgba(79,70,229,.3);
-    }
-    .btn-primary:hover { background: var(--indigo-dk); box-shadow: 0 4px 14px rgba(79,70,229,.4); }
-    .btn-primary:disabled {
-      background: var(--border2); color: var(--text3);
-      box-shadow: none; cursor: not-allowed; transform: none;
-    }
-    .btn-outline {
-      background: var(--surface); border: 1px solid var(--border2);
-      color: var(--text2);
-    }
-    .btn-outline:hover { background: var(--surface2); border-color: var(--text3); color: var(--text); }
-    .btn-ghost { background: transparent; color: var(--text2); }
-    .btn-ghost:hover { background: var(--surface2); color: var(--text); }
-    .btn-sm { padding: 5px 12px; font-size: 12px; }
-    .btn-full { width: 100%; }
-
-    /* ── Form elements ───────────────────────────────────────────────── */
-    .field { margin-bottom: 14px; }
-    .field label {
-      display: block; font-size: 12px; font-weight: 500;
-      color: var(--text2); margin-bottom: 5px;
-    }
-    .field-hint { font-size: 11px; color: var(--text3); margin-top: 4px; }
-
-    /* Toggle */
-    .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-    .toggle-row .label-block { flex: 1; }
-    .toggle-row .label-block strong { font-size: 13px; color: var(--text); font-weight: 500; }
-    .toggle-row .label-block small { display: block; font-size: 11px; color: var(--text3); margin-top: 2px; }
-    .switch { position: relative; width: 40px; height: 22px; flex-shrink: 0; }
-    .switch input { opacity: 0; width: 0; height: 0; position: absolute; }
-    .switch-track {
-      position: absolute; inset: 0; background: var(--border2);
-      border-radius: 11px; cursor: pointer; transition: background .2s;
-    }
-    .switch-track:before {
-      content: ''; position: absolute;
-      width: 16px; height: 16px; border-radius: 50%;
-      background: #fff; top: 3px; left: 3px;
-      box-shadow: 0 1px 3px rgba(0,0,0,.2);
-      transition: transform .2s;
-    }
-    .switch input:checked + .switch-track { background: var(--indigo); }
-    .switch input:checked + .switch-track:before { transform: translateX(18px); }
-
-    /* ── File chips ──────────────────────────────────────────────────── */
-    .file-chips { display: flex; flex-direction: column; gap: 6px; }
-    .file-chip {
-      display: flex; align-items: center; gap: 9px;
-      padding: 8px 12px; border-radius: var(--radius-sm);
-      background: var(--surface2); border: 1px solid var(--border);
-      font-size: 12px; color: var(--text2);
-    }
-    .file-chip .fc-icon {
-      width: 26px; height: 26px; border-radius: 5px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 13px; flex-shrink: 0;
-    }
-    .fc-csv { background: #D1FAE5; color: #065F46; }
-    .fc-json { background: #DBEAFE; color: #1E3A8A; }
-    .fc-txt { background: #FEF3C7; color: #92400E; }
-    .fc-xml { background: #FCE7F3; color: #831843; }
-    .fc-default { background: var(--border); color: var(--text2); }
-    .file-chip .fc-name { font-weight: 500; flex: 1; }
-    .file-chip .fc-type { font-size: 10px; color: var(--text3); background: var(--border); padding: 1px 6px; border-radius: 3px; }
-
-    /* ── Drop zone ───────────────────────────────────────────────────── */
-    .drop-zone {
-      border: 2px dashed var(--border2); border-radius: var(--radius);
-      padding: 18px; text-align: center; cursor: pointer;
-      color: var(--text3); font-size: 12px;
-      transition: border-color .15s, background .15s;
-    }
-    .drop-zone:hover { border-color: var(--indigo); background: var(--indigo-lt); color: var(--indigo); }
-    .drop-zone .dz-icon { font-size: 22px; margin-bottom: 6px; }
-    .drop-zone .dz-label { font-weight: 500; }
-
-    /* ── Progress ────────────────────────────────────────────────────── */
-    .progress-section { margin-top: 16px; }
-    .progress-track {
-      height: 5px; background: var(--surface2); border-radius: 5px;
-      overflow: hidden; margin-bottom: 8px;
-    }
-    .progress-fill {
-      height: 100%; background: linear-gradient(90deg, var(--indigo), #7C3AED);
-      border-radius: 5px; transition: width .5s cubic-bezier(.4,0,.2,1);
-    }
-    .progress-steps { display: flex; justify-content: space-between; gap: 2px; margin-bottom: 8px; }
-    .progress-step {
-      flex: 1; height: 3px; border-radius: 2px;
-      background: var(--border); transition: background .3s;
-    }
-    .progress-step.done { background: var(--indigo); }
-    .progress-step.active { background: #818CF8; }
-    .progress-msg { font-size: 12px; color: var(--text2); min-height: 18px; }
-
-    /* ── Stats row ───────────────────────────────────────────────────── */
-    .stats-row { display: grid; grid-template-columns: repeat(5,1fr); gap: 10px; margin-bottom: 20px; }
-    @media (max-width: 700px) { .stats-row { grid-template-columns: repeat(2,1fr); } }
-    .stat-tile {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 14px 16px;
-    }
-    .stat-tile .st-val {
-      font-size: 26px; font-weight: 700; color: var(--text); line-height: 1;
-    }
-    .stat-tile .st-val.teal { color: var(--teal); }
-    .stat-tile .st-val.amber { color: var(--amber); }
-    .stat-tile .st-val.rose { color: var(--rose); }
-    .stat-tile .st-val.indigo { color: var(--indigo); }
-    .stat-tile .st-lbl { font-size: 11px; color: var(--text3); margin-top: 4px; font-weight: 500; }
-
-    /* ── Tab bar ─────────────────────────────────────────────────────── */
-    .tab-bar {
-      display: flex; gap: 2px;
-      border-bottom: 1px solid var(--border);
-      margin-bottom: 18px; padding-bottom: 0;
-    }
-    .tab-item {
-      padding: 8px 16px; font-size: 13px; font-weight: 500;
-      color: var(--text3); cursor: pointer; border-radius: var(--radius-sm) var(--radius-sm) 0 0;
-      border-bottom: 2px solid transparent; margin-bottom: -1px;
-      transition: color .15s;
-    }
-    .tab-item:hover { color: var(--text2); }
-    .tab-item.active { color: var(--indigo); border-bottom-color: var(--indigo); }
-
-    /* ── Table ───────────────────────────────────────────────────────── */
-    .tbl-wrap { overflow-x: auto; border-radius: var(--radius); border: 1px solid var(--border); }
-    table { width: 100%; border-collapse: collapse; }
-    thead { background: var(--surface2); }
-    th {
-      padding: 10px 14px; text-align: left;
-      font-size: 11px; font-weight: 600; color: var(--text3);
-      text-transform: uppercase; letter-spacing: .6px;
-      white-space: nowrap; border-bottom: 1px solid var(--border);
-    }
-    td {
-      padding: 11px 14px;
-      border-bottom: 1px solid var(--border);
-      vertical-align: middle;
-      font-size: 13px;
-    }
-    tbody tr:last-child td { border-bottom: none; }
-    tbody tr:hover td { background: #FAFAF8; }
-
-    .sku-code {
-      font-family: 'SF Mono','Fira Code',monospace;
-      font-size: 11px; font-weight: 600;
-      background: var(--indigo-lt); color: var(--indigo);
-      padding: 2px 7px; border-radius: 4px;
-    }
-    .cat-badge {
-      font-size: 11px; font-weight: 500;
-      background: var(--surface2); color: var(--text2);
-      padding: 2px 8px; border-radius: 4px; white-space: nowrap;
-    }
-    .price-cell { font-weight: 600; color: var(--text); }
-    .score-cell { white-space: nowrap; }
-    .score-num { font-weight: 700; font-size: 13px; }
-    .score-bar { width: 44px; height: 4px; background: var(--border); border-radius: 2px; margin-top: 3px; }
-    .score-bar-fill { height: 100%; border-radius: 2px; }
-    .desc-text { color: var(--text2); font-size: 12px; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .flag-ok { color: var(--teal); font-size: 13px; }
-    .flag-warn { font-size: 11px; color: var(--amber); }
-    .review-badge {
-      display: inline-flex; align-items: center; gap: 4px;
-      font-size: 10px; font-weight: 600; color: var(--amber);
-      background: var(--amber-lt); padding: 1px 6px; border-radius: 3px; margin-top: 2px;
+    .chart-title{
+      font-size:11px;font-weight:600;color:var(--text2);
+      margin-bottom:8px;display:flex;align-items:center;gap:5px;
     }
 
-    /* ── Job history ─────────────────────────────────────────────────── */
-    .job-list { display: flex; flex-direction: column; gap: 0; }
-    .job-item {
-      display: flex; align-items: center; gap: 10px;
-      padding: 10px 0;
-      border-bottom: 1px solid var(--border);
-      font-size: 12px;
+    /*
+     * .ch-wrap is the ONLY thing that controls chart height.
+     * - position:relative  → Chart.js sizes its canvas to fill this
+     * - overflow:hidden    → canvas can NEVER grow past this box
+     * - height is fixed in px so it never stretches on re-render
+     */
+    .ch-wrap{
+      position:relative;
+      width:100%;
+      height:160px;
+      overflow:hidden;   /* hard ceiling — canvas cannot escape */
     }
-    .job-item:last-child { border-bottom: none; }
-    .job-item .ji-id { font-family: monospace; color: var(--text3); flex-shrink: 0; }
-    .job-item .ji-meta { flex: 1; color: var(--text2); }
-
-    /* ── Status badges ───────────────────────────────────────────────── */
-    .sbadge {
-      display: inline-block; padding: 2px 9px; border-radius: 4px;
-      font-size: 11px; font-weight: 600; flex-shrink: 0;
-    }
-    .sb-queued  { background: var(--surface2); color: var(--text3); }
-    .sb-running { background: #DBEAFE; color: #1D4ED8; }
-    .sb-complete{ background: var(--green-lt); color: var(--green); }
-    .sb-failed  { background: var(--rose-lt); color: var(--rose); }
-
-    /* ── Report box ──────────────────────────────────────────────────── */
-    .report-pre {
-      background: #1C1917; color: #D6D3D1;
-      border-radius: var(--radius); padding: 18px 20px;
-      font-family: 'SF Mono','Fira Code',monospace;
-      font-size: 12px; line-height: 1.7;
-      white-space: pre-wrap; max-height: 480px;
-      overflow-y: auto;
+    .ch-wrap canvas{
+      /* Reinforce: canvas must stay inside the wrapper */
+      max-width:100% !important;
+      max-height:100% !important;
     }
 
-    /* ── Empty state ─────────────────────────────────────────────────── */
-    .empty-state {
-      text-align: center; padding: 64px 20px; color: var(--text3);
-    }
-    .empty-state .es-icon { font-size: 42px; margin-bottom: 14px; }
-    .empty-state .es-title { font-size: 15px; font-weight: 600; color: var(--text2); margin-bottom: 6px; }
-    .empty-state .es-sub { font-size: 13px; }
+    /* ── Table ── */
+    .tbl-wrap{overflow-x:auto;border-radius:var(--r);border:1px solid var(--border)}
+    table{width:100%;border-collapse:collapse}
+    thead{background:var(--surface2)}
+    th{padding:9px 13px;text-align:left;font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:.5px;white-space:nowrap;border-bottom:1px solid var(--border)}
+    td{padding:10px 13px;border-bottom:1px solid var(--border);vertical-align:middle;font-size:13px}
+    tbody tr:last-child td{border-bottom:none}
+    tbody tr:hover td{background:#FAFAF8}
+    .sku{font-family:'SF Mono','Fira Code',monospace;font-size:11px;font-weight:600;background:var(--indigo-lt);color:var(--indigo);padding:2px 6px;border-radius:4px}
+    .cat{font-size:11px;font-weight:500;background:var(--surface2);color:var(--text2);padding:2px 7px;border-radius:4px;white-space:nowrap}
+    .sc-num{font-weight:700;font-size:13px}
+    .sc-bar{width:42px;height:4px;background:var(--border);border-radius:2px;margin-top:3px}
+    .sc-fill{height:100%;border-radius:2px}
+    .desc-clip{color:var(--text2);font-size:12px;max-width:250px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .flag-ok{color:var(--teal);font-size:13px}
+    .flag-w{font-size:11px;color:var(--amber)}
+    .review-pill{display:inline-flex;align-items:center;gap:3px;font-size:10px;font-weight:600;color:var(--amber);background:var(--amber-lt);padding:1px 5px;border-radius:3px;margin-top:2px}
+    .sc-hi{color:var(--green)}.sc-mid{color:var(--amber)}.sc-lo{color:var(--rose)}
+    .fill-hi{background:var(--green)}.fill-mid{background:var(--amber)}.fill-lo{background:var(--rose)}
 
-    /* ── Pagination ──────────────────────────────────────────────────── */
-    .pagination {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-top: 14px; font-size: 12px; color: var(--text3);
-    }
-    .pagination .pg-info { }
-    .pagination .pg-btns { display: flex; gap: 6px; }
+    /* ── Pagination ── */
+    .pagination{display:flex;align-items:center;justify-content:space-between;margin-top:12px;font-size:12px;color:var(--text3)}
+    .pg-btns{display:flex;gap:5px}
 
-    /* ── Toast ───────────────────────────────────────────────────────── */
-    .toast-container { position: fixed; bottom: 24px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 8px; }
-    .toast {
-      display: flex; align-items: center; gap: 10px;
-      padding: 12px 16px; border-radius: var(--radius);
-      background: var(--text); color: var(--bg);
-      font-size: 13px; font-weight: 500;
-      box-shadow: var(--shadow-lg);
-      animation: slideIn .25s ease;
-      max-width: 340px;
-    }
-    .toast.t-success { background: var(--teal); color: #fff; }
-    .toast.t-error { background: var(--rose); color: #fff; }
-    .toast.t-info { background: var(--indigo); color: #fff; }
-    @keyframes slideIn { from { opacity:0; transform: translateX(20px); } to { opacity:1; transform: none; } }
+    /* ── Review cards ── */
+    .rv-card{border:1px solid var(--border);border-radius:var(--r);padding:15px 17px;margin-bottom:10px;background:var(--surface);transition:border-color .15s}
+    .rv-card.approved{border-left:3px solid var(--green);opacity:.65}
+    .rv-card.rejected{border-left:3px solid var(--rose);opacity:.65}
+    .rv-hd{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+    .rv-meta{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px;font-size:12px;color:var(--text2)}
+    .rv-meta span{background:var(--surface2);padding:2px 7px;border-radius:4px}
+    .rv-desc{font-size:12px;color:var(--text2);line-height:1.6;margin-bottom:10px}
+    .rv-flag{font-size:11px;color:var(--amber);display:block;margin-bottom:2px}
+    .rv-actions{display:flex;gap:7px;align-items:center}
+    .rv-note{flex:1;padding:5px 9px;border-radius:6px;border:1px solid var(--border);background:var(--surface2);font-size:12px;color:var(--text);outline:none}
+    .rv-note:focus{border-color:var(--indigo)}
+    .rv-badge{display:inline-flex;align-items:center;justify-content:center;width:17px;height:17px;border-radius:50%;background:var(--amber);color:#fff;font-size:10px;font-weight:700;margin-left:4px}
 
-    /* ── Divider / spacer ────────────────────────────────────────────── */
-    .gap { margin-top: 20px; }
-    .divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+    /* ── Report ── */
+    .report-pre{background:#1C1917;color:#D6D3D1;border-radius:var(--r);padding:16px 18px;font-family:'SF Mono','Fira Code',monospace;font-size:12px;line-height:1.7;white-space:pre-wrap;max-height:460px;overflow-y:auto}
 
-    /* ── Review cards ────────────────────────────────────────────────── */
-    .review-card {
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px 18px;
-      margin-bottom: 12px;
-      background: var(--surface);
-      transition: border-color .15s;
-    }
-    .review-card.approved { border-left: 3px solid var(--green); opacity: .7; }
-    .review-card.rejected { border-left: 3px solid var(--rose); opacity: .7; }
-    .review-card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-    .review-card-title { font-weight:600; font-size:13px; }
-    .review-card-meta { display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px; font-size:12px; color:var(--text2); }
-    .review-card-meta span { background:var(--surface2); padding:2px 8px; border-radius:4px; }
-    .review-card-desc { font-size:12px; color:var(--text2); line-height:1.6; margin-bottom:12px; }
-    .review-card-flags { margin-bottom:12px; }
-    .review-flag { font-size:11px; color:var(--amber); display:block; margin-bottom:3px; }
-    .review-actions { display:flex; gap:8px; align-items:center; }
-    .review-note { flex:1; padding:6px 10px; border-radius:6px; border:1px solid var(--border); background:var(--surface2); font-size:12px; color:var(--text); outline:none; }
-    .review-note:focus { border-color:var(--indigo); }
-    .btn-approve { background:var(--green-lt); color:var(--green); border:1px solid #bbf7d0; }
-    .btn-approve:hover { background:#dcfce7; }
-    .btn-reject  { background:var(--rose-lt);  color:var(--rose);  border:1px solid #fecdd3; }
-    .btn-reject:hover  { background:#ffe4e6; }
-    .review-count-badge {
-      display:inline-flex; align-items:center; justify-content:center;
-      width:18px; height:18px; border-radius:50%;
-      background:var(--amber); color:#fff;
-      font-size:10px; font-weight:700; margin-left:5px;
-    }
+    /* ── Empty state ── */
+    .empty{text-align:center;padding:60px 20px;color:var(--text3)}
+    .empty-icon{font-size:40px;margin-bottom:12px}
+    .empty-title{font-size:15px;font-weight:600;color:var(--text2);margin-bottom:5px}
+    .empty-sub{font-size:13px}
 
-    /* ── Spinner ─────────────────────────────────────────────────────── */
-    @keyframes spin { to { transform: rotate(360deg); } }
-    .spin {
-      display: inline-block; width: 14px; height: 14px;
-      border: 2px solid currentColor; border-top-color: transparent;
-      border-radius: 50%; animation: spin .7s linear infinite;
-    }
-    .hidden { display: none !important; }
+    /* ── Toast ── */
+    .toasts{position:fixed;bottom:22px;right:22px;z-index:999;display:flex;flex-direction:column;gap:7px}
+    .toast{display:flex;align-items:center;gap:9px;padding:11px 15px;border-radius:var(--r);background:var(--text);color:var(--bg);font-size:13px;font-weight:500;box-shadow:var(--sh-md);animation:sli .22s ease;max-width:320px}
+    .toast.t-ok{background:var(--teal);color:#fff}
+    .toast.t-err{background:var(--rose);color:#fff}
+    .toast.t-info{background:var(--indigo);color:#fff}
+    @keyframes sli{from{opacity:0;transform:translateX(16px)}to{opacity:1;transform:none}}
 
-    /* ── Score colour helpers ────────────────────────────────────────── */
-    .score-high  { color: var(--green); }
-    .score-mid   { color: var(--amber); }
-    .score-low   { color: var(--rose); }
-    .fill-high   { background: var(--green); }
-    .fill-mid    { background: var(--amber); }
-    .fill-low    { background: var(--rose); }
+    /* ── Misc ── */
+    .divider{border:none;border-top:1px solid var(--border);margin:14px 0}
+    .mt{margin-top:14px}
+    .hidden{display:none!important}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .spin{display:inline-block;width:13px;height:13px;border:2px solid currentColor;border-top-color:transparent;border-radius:50%;animation:spin .7s linear infinite}
   </style>
 </head>
 <body>
 
-<!-- ── Topbar ─────────────────────────────────────────────────────────────── -->
+<!-- Topbar -->
 <header class="topbar">
-  <div class="topbar-logo">
-    <div class="icon-wrap">📦</div>
+  <div class="logo">
+    <div class="logo-icon">📦</div>
     Catalog Enrichment
-    <span class="sub">/ Pipeline</span>
+    <span class="logo-sub">/ Pipeline</span>
   </div>
-  <div class="topbar-spacer"></div>
-  <nav class="topbar-links">
-    <a href="/docs" target="_blank">API Docs</a>
-    <a href="/redoc" target="_blank">ReDoc</a>
-  </nav>
-  <div class="status-pill" id="ollama-pill">
-    <span class="pip" id="ollama-pip"></span>
-    <span id="ollama-label">Checking…</span>
+  <div class="topbar-space"></div>
+  <a href="/docs" target="_blank" class="nav-link">API Docs</a>
+  <a href="/redoc" target="_blank" class="nav-link">ReDoc</a>
+  <div class="status-pill">
+    <span class="pip" id="pip"></span>
+    <span id="ollama-lbl">Checking…</span>
   </div>
 </header>
 
-<!-- ── Page ──────────────────────────────────────────────────────────────── -->
 <div class="page">
-  <div class="two-col">
+  <div class="layout">
 
-    <!-- ══ Left column ══════════════════════════════════════════════════════ -->
+    <!-- ═══ LEFT SIDEBAR ═══ -->
     <aside>
 
-      <!-- Run card -->
+      <!-- Run pipeline -->
       <div class="card">
-        <div class="card-title"><span class="icon">⚡</span> Run Pipeline</div>
+        <div class="card-hd"><span class="icon">⚡</span> Run Pipeline</div>
 
-        <!-- Input files -->
         <div class="field">
-          <label>Supplier input files</label>
+          <label>Supplier files detected</label>
           <div class="file-chips" id="file-list">
-            <div class="file-chip"><span class="spin" style="color:var(--text3)"></span>&nbsp;Loading…</div>
+            <div class="fc"><span class="spin" style="color:var(--text3)"></span>&nbsp;Loading…</div>
           </div>
         </div>
 
-        <!-- Upload -->
         <div class="field">
-          <label>Add a supplier file</label>
-          <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+          <label>Upload a new file</label>
+          <div class="dz" onclick="document.getElementById('fi').click()">
             <div class="dz-icon">📂</div>
-            <div class="dz-label">Click to upload</div>
-            <div style="margin-top:3px">CSV · JSON · TXT · XML</div>
+            <div class="dz-lbl">Click to upload</div>
+            <div style="margin-top:2px;font-size:11px">CSV · JSON · TXT · XML</div>
           </div>
-          <input type="file" id="file-input" accept=".csv,.json,.txt,.xml" class="hidden" />
+          <input type="file" id="fi" accept=".csv,.json,.txt,.xml" class="hidden"/>
         </div>
 
-        <hr class="divider" />
+        <hr class="divider"/>
 
-        <!-- Mock toggle -->
         <div class="field">
           <div class="toggle-row">
-            <div class="label-block">
+            <div class="lb">
               <strong>Mock LLM mode</strong>
-              <small>Bypass Ollama — uses rule-based stubs</small>
+              <small>Run without Ollama — instant rule-based stubs</small>
             </div>
-            <label class="switch">
-              <input type="checkbox" id="mock-toggle" />
-              <span class="switch-track"></span>
+            <label class="sw">
+              <input type="checkbox" id="mock"/>
+              <span class="sw-track"></span>
             </label>
           </div>
         </div>
@@ -503,99 +300,179 @@
         </button>
 
         <!-- Progress -->
-        <div class="progress-section hidden" id="progress-section">
-          <div style="margin:14px 0 6px; display:flex; justify-content:space-between; font-size:12px; color:var(--text2)">
-            <span id="progress-step-label">Starting…</span>
-            <span id="progress-pct">0%</span>
+        <div class="prog-sec hidden" id="prog">
+          <div class="prog-head">
+            <span id="prog-lbl">Starting…</span>
+            <span id="prog-pct" style="font-weight:600;color:var(--indigo)">0%</span>
           </div>
-          <div class="progress-steps" id="progress-steps">
-            <div class="progress-step" id="ps0"></div>
-            <div class="progress-step" id="ps1"></div>
-            <div class="progress-step" id="ps2"></div>
-            <div class="progress-step" id="ps3"></div>
-            <div class="progress-step" id="ps4"></div>
-            <div class="progress-step" id="ps5"></div>
-            <div class="progress-step" id="ps6"></div>
-            <div class="progress-step" id="ps7"></div>
+          <div class="prog-dots" id="prog-dots">
+            <div class="pd" id="pd0"></div><div class="pd" id="pd1"></div>
+            <div class="pd" id="pd2"></div><div class="pd" id="pd3"></div>
+            <div class="pd" id="pd4"></div><div class="pd" id="pd5"></div>
+            <div class="pd" id="pd6"></div><div class="pd" id="pd7"></div>
           </div>
-          <div class="progress-track">
-            <div class="progress-fill" id="progress-fill" style="width:0%"></div>
+          <div class="prog-bar-bg"><div class="prog-bar" id="prog-fill" style="width:0%"></div></div>
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3);margin-top:5px">
+            <span>Ingest→Normalize→Deduplicate→Map→Fill→Describe→Score→Report</span>
+            <span id="eta-lbl"></span>
           </div>
         </div>
       </div>
 
       <!-- Recent jobs -->
-      <div class="card gap">
-        <div class="card-title"><span class="icon">🕑</span> Recent Jobs</div>
-        <div class="job-list" id="job-list">
-          <p style="font-size:12px;color:var(--text3)">No jobs yet.</p>
-        </div>
+      <div class="card mt">
+        <div class="card-hd"><span class="icon">🕑</span> Recent Jobs</div>
+        <div id="job-list"><p style="font-size:12px;color:var(--text3)">No jobs yet.</p></div>
+      </div>
+
+      <!-- Quick guide -->
+      <div class="card mt" style="background:var(--indigo-lt);border-color:#C7D2FE">
+        <div class="card-hd" style="color:var(--indigo)"><span class="icon">💡</span> Quick Guide</div>
+        <ol style="padding-left:16px;font-size:12px;color:var(--text2);line-height:2">
+          <li>Make sure <strong>Ollama is running</strong> (green dot above)</li>
+          <li>Upload supplier files or use the 3 sample files</li>
+          <li>Click <strong>Run Enrichment Pipeline</strong></li>
+          <li>Watch the 8 steps complete in real time</li>
+          <li>Explore results in the <strong>Overview, Products, Charts</strong> tabs</li>
+          <li>Review flagged SKUs in <strong>Human Review</strong></li>
+          <li>Download enriched catalog as JSON or CSV</li>
+        </ol>
       </div>
 
     </aside>
 
-    <!-- ══ Right column ═════════════════════════════════════════════════════ -->
+    <!-- ═══ MAIN PANEL ═══ -->
     <main>
-      <div class="card" id="results-card">
+      <div class="card" id="main-card">
 
-        <!-- Empty state -->
-        <div class="empty-state" id="empty-state">
-          <div class="es-icon">🗂️</div>
-          <div class="es-title">No results yet</div>
-          <div class="es-sub">Run the pipeline on the left to enrich your catalog.<br/>Results appear here automatically once complete.</div>
+        <!-- EMPTY STATE -->
+        <div class="empty" id="empty-state">
+          <div class="empty-icon">🗂️</div>
+          <div class="empty-title">Your enriched catalog will appear here</div>
+          <div class="empty-sub">
+            Run the pipeline using the controls on the left.<br/>
+            Results load automatically once all 8 agents complete.
+          </div>
         </div>
 
-        <!-- Results content -->
-        <div id="results-content" class="hidden">
+        <!-- RESULTS (hidden until pipeline completes) -->
+        <div id="results" class="hidden">
 
-          <!-- Stats row -->
-          <div class="stats-row" id="stats-row"></div>
+          <!-- KPI tiles -->
+          <div class="stats-grid" id="kpi"></div>
 
-          <!-- Download row -->
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-            <div class="tab-bar" style="margin-bottom:0;border-bottom:none">
-              <div class="tab-item active" onclick="switchTab('products')">Products</div>
-              <div class="tab-item" onclick="switchTab('report')">Pipeline Report</div>
-              <div class="tab-item" onclick="switchTab('review')">Human Review <span id="review-count-badge"></span></div>
+          <!-- Toolbar: tabs + downloads -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:0">
+            <div class="tabs">
+              <div class="tab on"  onclick="tab('overview')">📊 Overview</div>
+              <div class="tab"     onclick="tab('products')">📋 Products</div>
+              <div class="tab"     onclick="tab('review')">👤 Review <span id="rv-badge"></span></div>
+              <div class="tab"     onclick="tab('report')">📄 Report</div>
             </div>
-            <div style="display:flex;gap:8px" id="dl-btns"></div>
+            <div style="display:flex;gap:7px;padding-bottom:1px" id="dl-btns"></div>
           </div>
-          <hr class="divider" style="margin-top:0" />
+          <hr class="divider" style="margin-top:0"/>
 
-          <!-- Products tab -->
-          <div id="tab-products">
+          <!-- ── TAB: OVERVIEW ── -->
+          <div id="tab-overview">
+
+            <!--
+              6-chart layout in 2 rows of 3:
+              Row 1: Top 5 SKUs | Score Distribution | Supplier Quality
+              Row 2: Field Completeness Radar | Before vs After | SKUs by Category
+            -->
+            <div class="chart-section">
+
+              <!-- 1. Top 5 SKUs by score — horizontal bar -->
+              <div class="chart-card">
+                <div class="chart-title">🏆 Top 5 by Quality Score</div>
+                <div class="ch-wrap"><canvas id="chart-top5"></canvas></div>
+              </div>
+
+              <!-- 2. Score distribution — doughnut -->
+              <div class="chart-card">
+                <div class="chart-title">📈 Score Distribution</div>
+                <div class="ch-wrap"><canvas id="chart-dist"></canvas></div>
+              </div>
+
+              <!-- 3. Supplier quality comparison — bar -->
+              <div class="chart-card">
+                <div class="chart-title">🏭 Avg Score by Supplier</div>
+                <div class="ch-wrap"><canvas id="chart-supplier"></canvas></div>
+              </div>
+
+              <!-- 4. Field completeness radar -->
+              <div class="chart-card">
+                <div class="chart-title">🕸️ Field Completeness</div>
+                <div class="ch-wrap"><canvas id="chart-radar"></canvas></div>
+              </div>
+
+              <!-- 5. Enrichment before vs after — grouped bar -->
+              <div class="chart-card">
+                <div class="chart-title">⚡ Before vs After Enrichment</div>
+                <div class="ch-wrap"><canvas id="chart-before-after"></canvas></div>
+              </div>
+
+              <!-- 6. SKUs by category — bar -->
+              <div class="chart-card">
+                <div class="chart-title">🗂️ SKUs by Category</div>
+                <div class="ch-wrap"><canvas id="chart-cat"></canvas></div>
+              </div>
+
+            </div>
+
+            <!-- Enrichment Actions — compact 3-col grid -->
+            <div style="background:var(--surface2);border-radius:var(--r);padding:12px 14px">
+              <div style="font-size:11px;font-weight:600;color:var(--text2);margin-bottom:8px">Pipeline Actions Summary</div>
+              <div id="enrich-summary" style="display:grid;grid-template-columns:repeat(3,1fr);gap:7px;font-size:12px"></div>
+            </div>
+
+          </div>
+
+          <!-- ── TAB: PRODUCTS ── -->
+          <div id="tab-products" class="hidden">
+            <!-- Search + filter row -->
+            <div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">
+              <input id="search" type="text" placeholder="🔍  Search by name or SKU…"
+                oninput="filterProducts()"
+                style="flex:1;min-width:180px;padding:7px 12px;border:1px solid var(--border2);border-radius:7px;font-size:13px;background:var(--surface2);color:var(--text);outline:none"/>
+              <select id="cat-filter" onchange="filterProducts()"
+                style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:13px;background:var(--surface2);color:var(--text);outline:none">
+                <option value="">All categories</option>
+              </select>
+              <select id="score-filter" onchange="filterProducts()"
+                style="padding:7px 10px;border:1px solid var(--border2);border-radius:7px;font-size:13px;background:var(--surface2);color:var(--text);outline:none">
+                <option value="">All scores</option>
+                <option value="high">High (≥80)</option>
+                <option value="mid">Medium (50–79)</option>
+                <option value="low">Low (&lt;50)</option>
+              </select>
+            </div>
             <div class="tbl-wrap">
               <table>
-                <thead>
-                  <tr>
-                    <th>SKU</th>
-                    <th>Product Name</th>
-                    <th>Category</th>
-                    <th>Price</th>
-                    <th>Score</th>
-                    <th>Description</th>
-                    <th>Issues</th>
-                  </tr>
-                </thead>
-                <tbody id="products-body"></tbody>
+                <thead><tr>
+                  <th>SKU</th><th>Product</th><th>Category</th>
+                  <th>Price</th><th>Score</th><th>Description</th><th>Issues</th>
+                </tr></thead>
+                <tbody id="tbl-body"></tbody>
               </table>
             </div>
             <div class="pagination" id="pagination"></div>
           </div>
 
-          <!-- Report tab -->
-          <div id="tab-report" class="hidden">
-            <pre class="report-pre" id="report-text"></pre>
+          <!-- ── TAB: HUMAN REVIEW ── -->
+          <div id="tab-review" class="hidden">
+            <div id="rv-empty" style="text-align:center;padding:36px;color:var(--text3)">
+              <div style="font-size:2rem;margin-bottom:8px">✅</div>
+              <div style="font-weight:600;color:var(--text2)">All SKUs look good!</div>
+              <div style="font-size:12px;margin-top:4px">No products scored below the review threshold.</div>
+            </div>
+            <div id="rv-list" class="hidden"></div>
           </div>
 
-          <!-- Human Review tab -->
-          <div id="tab-review" class="hidden">
-            <div id="review-empty" style="text-align:center;padding:40px;color:var(--text3)">
-              <div style="font-size:2rem;margin-bottom:10px">✅</div>
-              <div style="font-weight:600;color:var(--text2)">No products need review</div>
-              <div style="font-size:12px;margin-top:6px">All SKUs scored above the review threshold</div>
-            </div>
-            <div id="review-list" class="hidden"></div>
+          <!-- ── TAB: REPORT ── -->
+          <div id="tab-report" class="hidden">
+            <pre class="report-pre" id="report-txt"></pre>
           </div>
 
         </div>
@@ -605,399 +482,571 @@
   </div>
 </div>
 
-<!-- ── Toast container ───────────────────────────────────────────────────── -->
-<div class="toast-container" id="toasts"></div>
+<div class="toasts" id="toasts"></div>
 
-<!-- ── Hidden file input ─────────────────────────────────────────────────── -->
 <script>
-  /* ── Config ─────────────────────────────────────────────────────────── */
-  const API = '';
-  let currentJobId = null;
-  let pollInterval = null;
-  let allProducts   = [];
-  let pageOffset    = 0;
-  const PAGE_SIZE   = 25;
-  const STEP_MAP    = {
-    'Step 1': 0, 'Step 2': 1, 'Step 3': 2, 'Step 4': 3,
-    'Step 5': 4, 'Step 6': 5, 'Step 7': 6, 'Step 8': 7,
+const API='';
+let jobId=null, poll=null, allProds=[], filteredProds=[], offset=0;
+const PAGE=20;
+const STEP_MAP={'Step 1':0,'Step 2':1,'Step 3':2,'Step 4':3,'Step 5':4,'Step 6':5,'Step 7':6,'Step 8':7};
+const STEP_PCT={0:10,1:25,2:40,3:53,4:65,5:80,6:91,7:97};
+let chartTop5=null, chartDist=null, chartCat=null, chartSupplier=null, chartRadar=null, chartBeforeAfter=null;
+
+/* ── Health ── */
+async function checkHealth(){
+  try{
+    const d=await get('/api/health');
+    const pip=document.getElementById('pip'), lbl=document.getElementById('ollama-lbl');
+    if(d.ollama.connected&&d.ollama.model_available){pip.className='pip live';lbl.textContent=`Ollama · ${d.ollama.model}`}
+    else if(d.ollama.connected){pip.className='pip dead';lbl.textContent=`Model '${d.ollama.model}' not found`}
+    else{pip.className='pip dead';lbl.textContent='Ollama offline'}
+    renderFiles(d.input_files||[]);
+  }catch{document.getElementById('ollama-lbl').textContent='API unreachable'}
+}
+
+/* ── File chips ── */
+const EXT_ICON={csv:'📊',json:'📋',txt:'📄',xml:'🗂️'};
+const EXT_CLS={csv:'fc-csv',json:'fc-json',txt:'fc-txt',xml:'fc-xml'};
+function renderFiles(files){
+  const el=document.getElementById('file-list');
+  if(!files.length){el.innerHTML='<div style="font-size:12px;color:var(--text3)">No files in data/input/</div>';return}
+  el.innerHTML=files.map(f=>{const e=f.split('.').pop().toLowerCase();return`<div class="fc"><span class="fc-ic ${EXT_CLS[e]||'fc-def'}">${EXT_ICON[e]||'📁'}</span><span class="fc-name">${esc(f)}</span><span class="fc-tag">${e.toUpperCase()}</span></div>`}).join('');
+}
+
+/* ── Upload ── */
+document.getElementById('fi').addEventListener('change',async e=>{
+  const f=e.target.files[0];if(!f)return;
+  const fd=new FormData();fd.append('file',f);
+  try{const r=await fetch(API+'/api/upload',{method:'POST',body:fd});if(r.ok){toast('ok',`Uploaded ${f.name}`);checkHealth()}else toast('err','Upload failed')}
+  catch{toast('err','Upload failed')}
+  e.target.value='';
+});
+
+/* ── Run ── */
+async function runPipeline(){
+  const btn=document.getElementById('run-btn'),mock=document.getElementById('mock').checked;
+  btn.disabled=true;btn.innerHTML='<span class="spin"></span>&nbsp; Queuing…';
+  showProg(true);setProg(0,'Queuing…');
+  try{
+    const d=await post('/api/run',{mock_llm:mock});
+    jobId=d.job_id;toast('info',`Job ${d.job_id} started`);
+    startSSE(d.job_id);
+  }catch{toast('err','Failed to start');resetBtn();showProg(false)}
+}
+
+/* ── SSE stream — real-time push, no polling ── */
+let _sse=null,_startTime=null,_etaIv=null;
+function startSSE(id){
+  if(_sse)_sse.close();
+  _startTime=Date.now();
+  _sse=new EventSource(API+'/api/status/'+id+'/stream');
+  _sse.onmessage=e=>{
+    const d=JSON.parse(e.data);
+    updateProgFromEvent(d);refreshJobs();
+    if(d.status==='complete'){
+      _sse.close();clearInterval(_etaIv);
+      setProg(100,'Complete ✓');allDots('done');
+      const secs=((Date.now()-_startTime)/1000).toFixed(1);
+      toast('ok',`Done · ${d.total_skus} SKUs · avg score ${d.avg_quality_score} · ${secs}s`);
+      setTimeout(()=>loadResults(id),400);resetBtn();
+    }else if(d.status==='failed'){
+      _sse.close();clearInterval(_etaIv);
+      setProg(0,'Failed: '+(d.error||'unknown'));
+      toast('err',d.error||'Pipeline failed');resetBtn();
+    }
   };
-  const STEP_PCT = { 0:10, 1:25, 2:40, 3:53, 4:65, 5:80, 6:91, 7:97 };
+  _sse.onerror=()=>{_sse.close();startPoll(id)};  // fallback
+  // Elapsed timer
+  _etaIv=setInterval(()=>{
+    const el=document.getElementById('eta-lbl');
+    if(el&&_startTime)el.textContent=`${Math.round((Date.now()-_startTime)/1000)}s elapsed`;
+  },1000);
+}
 
-  /* ── Health ─────────────────────────────────────────────────────────── */
-  async function checkHealth() {
-    try {
-      const d = await apiFetch('/api/health');
-      const pip = document.getElementById('ollama-pip');
-      const lbl = document.getElementById('ollama-label');
-      if (d.ollama.connected && d.ollama.model_available) {
-        pip.className = 'pip live';
-        lbl.textContent = `Ollama · ${d.ollama.model}`;
-      } else if (d.ollama.connected) {
-        pip.className = 'pip dead';
-        lbl.textContent = `Model '${d.ollama.model}' not found`;
-      } else {
-        pip.className = 'pip dead';
-        lbl.textContent = 'Ollama offline';
+/* ── Polling fallback ── */
+function startPoll(id){if(poll)clearInterval(poll);poll=setInterval(()=>doPoll(id),1800)}
+async function doPoll(id){
+  try{
+    const d=await get('/api/status/'+id);
+    updateProgFromEvent(d);refreshJobs();
+    if(d.status==='complete'){clearInterval(poll);setProg(100,'Complete ✓');allDots('done');toast('ok',`Done · ${d.total_skus} SKUs`);setTimeout(()=>loadResults(id),400);resetBtn()}
+    else if(d.status==='failed'){clearInterval(poll);setProg(0,'Failed');toast('err',d.error||'Failed');resetBtn()}
+  }catch{}
+}
+function updateProgFromEvent(d){
+  const msg=d.progress||'';
+  for(const[k,i]of Object.entries(STEP_MAP)){if(msg.startsWith(k)){setProg(STEP_PCT[i]||5,msg);for(let j=0;j<=i;j++)setDot(j,j<i?'done':'active');return}}
+  if(d.status==='running')setProg(5,msg);
+}
+function setProg(pct,msg){
+  document.getElementById('prog-fill').style.width=pct+'%';
+  document.getElementById('prog-lbl').textContent=msg;
+  document.getElementById('prog-pct').textContent=pct+'%';
+}
+function setDot(i,s){const el=document.getElementById('pd'+i);if(el)el.className='pd '+(s==='done'?'done':s==='active'?'active':'')}
+function allDots(s){for(let i=0;i<8;i++)setDot(i,s)}
+function showProg(v){document.getElementById('prog').classList.toggle('hidden',!v)}
+function resetBtn(){const b=document.getElementById('run-btn');b.disabled=false;b.innerHTML='▶&nbsp; Run Enrichment Pipeline'}
+
+/* ── Load results ── */
+async function loadResults(id){
+  const d=await get(`/api/results/${id}?limit=2000`);
+  allProds=d.products||[];filteredProds=[...allProds];offset=0;
+  document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('results').classList.remove('hidden');
+  renderKPI(d);renderDlBtns(id);renderCharts();
+  populateCatFilter();renderTable();renderEnrichSummary(d);
+  loadReviewQueue(id);
+  document.getElementById('report-txt').textContent=d.report||'';
+}
+
+/* ── KPI tiles ── */
+function renderKPI(d){
+  const prods=d.products||[];
+  const scores=prods.map(p=>p.quality_score||0);
+  const avg=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1):0;
+  const hi=prods.filter(p=>(p.quality_score||0)>=80).length;
+  const dups=prods.filter(p=>p.is_duplicate).length;
+  const rv=prods.filter(p=>p.needs_human_review).length;
+  document.getElementById('kpi').innerHTML=[
+    {v:d.total_skus,   l:'Total SKUs',   c:''},
+    {v:avg,             l:'Avg Score',    c:'c-indigo'},
+    {v:hi,              l:'Score ≥ 80',   c:'c-teal'},
+    {v:dups,            l:'Duplicates',   c:dups?'c-amber':''},
+    {v:rv,              l:'Need Review',  c:rv?'c-rose':''},
+  ].map(t=>`<div class="st"><div class="st-val ${t.c}">${t.v}</div><div class="st-lbl">${t.l}</div></div>`).join('');
+}
+
+function renderDlBtns(id){
+  document.getElementById('dl-btns').innerHTML=
+    `<a href="/api/results/${id}/download/json" download><button class="btn btn-outline btn-sm">↓ JSON</button></a>
+     <a href="/api/results/${id}/download/csv"  download><button class="btn btn-outline btn-sm">↓ CSV</button></a>`;
+}
+
+/* ── CHARTS ────────────────────────────────────────────────────────────
+   Rule: every chart gets  responsive:true + maintainAspectRatio:false
+   The .ch-wrap div is 160px tall with overflow:hidden — that is the
+   single source of truth for chart height.  onResize() clamps any
+   attempt by Chart.js to grow beyond the wrapper.
+─────────────────────────────────────────────────────────────────────── */
+
+/* Shared options injected into every chart to prevent size creep */
+const CHART_BASE = {
+  responsive: true,
+  maintainAspectRatio: false,
+  onResize(chart, {width}){
+    /* clamp: never let the canvas taller than its wrapper */
+    const wrap = chart.canvas.parentElement;
+    if(wrap){
+      const maxH = parseInt(getComputedStyle(wrap).height,10)||160;
+      if(chart.canvas.offsetHeight > maxH){
+        chart.canvas.style.height = maxH+'px';
       }
-      renderFileChips(d.input_files || []);
-    } catch(e) {
-      document.getElementById('ollama-label').textContent = 'API unreachable';
     }
-  }
+  },
+  animation:{duration:500},
+};
 
-  /* ── File chips ─────────────────────────────────────────────────────── */
-  const EXT_ICON  = { csv:'📊', json:'📋', txt:'📄', xml:'🗂️' };
-  const EXT_CLASS = { csv:'fc-csv', json:'fc-json', txt:'fc-txt', xml:'fc-xml' };
+function renderCharts(){
+  renderTop5Chart();
+  renderDistChart();
+  renderCatChart();
+  renderSupplierChart();
+  renderRadarChart();
+  renderBeforeAfterChart();
+}
 
-  function renderFileChips(files) {
-    const el = document.getElementById('file-list');
-    if (!files.length) {
-      el.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:4px 0">No files in data/input/</div>';
-      return;
+/* helper: destroy old instance then create fresh */
+function mkChart(id, config){
+  const canvas = document.getElementById(id);
+  if(!canvas) return null;
+  // destroy previous instance stored on canvas element
+  if(canvas._chartInst){ canvas._chartInst.destroy(); }
+  const instance = new Chart(canvas.getContext('2d'), config);
+  canvas._chartInst = instance;
+  return instance;
+}
+
+/* 1 ── Top 5 SKUs — horizontal bar */
+function renderTop5Chart(){
+  const sorted=[...allProds].sort((a,b)=>(b.quality_score||0)-(a.quality_score||0)).slice(0,5);
+  const labels=sorted.map(p=>{const n=p.product_name||p.sku||'—';return n.length>22?n.slice(0,20)+'…':n});
+  const scores=sorted.map(p=>p.quality_score||0);
+  const colors=scores.map(s=>s>=80?'#16A34A':s>=50?'#D97706':'#E11D48');
+  chartTop5=mkChart('chart-top5',{
+    type:'bar',
+    data:{labels,datasets:[{data:scores,backgroundColor:colors,borderRadius:4,borderSkipped:false}]},
+    options:{
+      ...CHART_BASE,
+      indexAxis:'y',
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`Score: ${c.raw}/100`}}},
+      scales:{
+        x:{min:0,max:100,grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:10},color:'#A09C94'},border:{display:false}},
+        y:{grid:{display:false},ticks:{font:{size:10,weight:'500'},color:'#1A1816'},border:{display:false}},
+      }
     }
-    el.innerHTML = files.map(f => {
-      const ext = f.split('.').pop().toLowerCase();
-      return `<div class="file-chip">
-        <span class="fc-icon ${EXT_CLASS[ext]||'fc-default'}">${EXT_ICON[ext]||'📁'}</span>
-        <span class="fc-name">${esc(f)}</span>
-        <span class="fc-type">${ext.toUpperCase()}</span>
-      </div>`;
-    }).join('');
-  }
-
-  /* ── Upload ─────────────────────────────────────────────────────────── */
-  document.getElementById('file-input').addEventListener('change', async (e) => {
-    const file = e.target.files[0]; if (!file) return;
-    const fd = new FormData(); fd.append('file', file);
-    try {
-      const r = await fetch(`${API}/api/upload`, { method: 'POST', body: fd });
-      if (r.ok) { toast('success', `Uploaded ${file.name}`); checkHealth(); }
-      else toast('error', 'Upload failed');
-    } catch(e) { toast('error', 'Upload failed'); }
-    e.target.value = '';
   });
+}
 
-  /* ── Run pipeline ───────────────────────────────────────────────────── */
-  async function runPipeline() {
-    const btn  = document.getElementById('run-btn');
-    const mock = document.getElementById('mock-toggle').checked;
-    btn.disabled = true;
-    btn.innerHTML = '<span class="spin"></span>&nbsp; Queuing…';
-    setProgressVisible(true);
-    setProgress(0, 'Queuing…');
-
-    try {
-      const d = await apiFetch('/api/run', { method:'POST',
-        body: JSON.stringify({ mock_llm: mock }),
-        headers: { 'Content-Type': 'application/json' }
-      });
-      currentJobId = d.job_id;
-      toast('info', `Job ${d.job_id} started`);
-      startPolling(d.job_id);
-    } catch(e) {
-      toast('error', 'Failed to start pipeline');
-      resetBtn();
-      setProgressVisible(false);
-    }
-  }
-
-  /* ── Polling ────────────────────────────────────────────────────────── */
-  function startPolling(jobId) {
-    if (pollInterval) clearInterval(pollInterval);
-    pollInterval = setInterval(() => poll(jobId), 1800);
-  }
-
-  async function poll(jobId) {
-    try {
-      const d = await apiFetch(`/api/status/${jobId}`);
-      updateProgressFromStatus(d);
-      refreshJobList();
-      if (d.status === 'complete') {
-        clearInterval(pollInterval);
-        setProgress(100, 'Complete ✓');
-        markAllSteps('done');
-        toast('success', `Enrichment complete · ${d.total_skus} SKUs · avg ${d.avg_quality_score}`);
-        setTimeout(() => loadResults(jobId), 600);
-        resetBtn();
-      } else if (d.status === 'failed') {
-        clearInterval(pollInterval);
-        setProgress(0, 'Failed: ' + (d.error || 'unknown error'));
-        toast('error', d.error || 'Pipeline failed');
-        resetBtn();
-      }
-    } catch(e) {}
-  }
-
-  function updateProgressFromStatus(job) {
-    const msg = job.progress || '';
-    for (const [k, stepIdx] of Object.entries(STEP_MAP)) {
-      if (msg.startsWith(k)) {
-        const pct = STEP_PCT[stepIdx] || 5;
-        setProgress(pct, msg);
-        for (let i = 0; i <= stepIdx; i++) markStep(i, i < stepIdx ? 'done' : 'active');
-        return;
+/* 2 ── Score distribution — doughnut */
+function renderDistChart(){
+  const hi =allProds.filter(p=>(p.quality_score||0)>=80).length;
+  const mid=allProds.filter(p=>{const s=p.quality_score||0;return s>=50&&s<80}).length;
+  const lo =allProds.filter(p=>(p.quality_score||0)<50).length;
+  chartDist=mkChart('chart-dist',{
+    type:'doughnut',
+    data:{
+      labels:['High ≥80','Mid 50–79','Low <50'],
+      datasets:[{data:[hi,mid,lo],backgroundColor:['#16A34A','#D97706','#E11D48'],borderWidth:0,hoverOffset:4}]
+    },
+    options:{
+      ...CHART_BASE,
+      cutout:'60%',
+      plugins:{
+        legend:{position:'bottom',labels:{font:{size:10},boxWidth:10,padding:6}},
+        tooltip:{callbacks:{label:c=>`${c.label}: ${c.raw} SKUs`}}
       }
     }
-    if (job.status === 'running') setProgress(5, msg);
-  }
+  });
+}
 
-  function setProgress(pct, msg) {
-    document.getElementById('progress-fill').style.width = pct + '%';
-    document.getElementById('progress-step-label').textContent = msg;
-    document.getElementById('progress-pct').textContent = pct + '%';
-  }
+/* 3 ── SKUs by category */
+function renderCatChart(){
+  const counts={};
+  allProds.forEach(p=>{const c=p.category||'Unknown';counts[c]=(counts[c]||0)+1});
+  const entries=Object.entries(counts).sort((a,b)=>b[1]-a[1]);
+  const palette=['#4F46E5','#0D9488','#D97706','#E11D48','#7C3AED','#2563EB','#16A34A','#9333EA','#DB2777','#CA8A04'];
+  chartCat=mkChart('chart-cat',{
+    type:'bar',
+    data:{
+      labels:entries.map(x=>x[0]),
+      datasets:[{data:entries.map(x=>x[1]),backgroundColor:entries.map((_,i)=>palette[i%palette.length]),borderRadius:4,borderSkipped:false}]
+    },
+    options:{
+      ...CHART_BASE,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw} SKUs`}}},
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10},color:'#5C5750'},border:{display:false}},
+        y:{grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:10},color:'#A09C94',stepSize:1},border:{display:false}},
+      }
+    }
+  });
+}
 
-  function markStep(i, state) {
-    const el = document.getElementById('ps' + i);
-    if (el) { el.className = 'progress-step ' + (state === 'done' ? 'done' : state === 'active' ? 'active' : ''); }
-  }
+/* 4 ── Avg score by supplier */
+function renderSupplierChart(){
+  const sup={};
+  allProds.forEach(p=>{
+    const s=p.supplier_id||'Unknown';
+    if(!sup[s])sup[s]={total:0,n:0};
+    sup[s].total+=(p.quality_score||0);sup[s].n++;
+  });
+  const labels=Object.keys(sup).sort();
+  const avgs  =labels.map(s=>+(sup[s].total/sup[s].n).toFixed(1));
+  const counts=labels.map(s=>sup[s].n);
+  const palette=['#4F46E5','#0D9488','#D97706','#E11D48','#7C3AED'];
+  chartSupplier=mkChart('chart-supplier',{
+    type:'bar',
+    data:{labels,datasets:[{data:avgs,backgroundColor:labels.map((_,i)=>palette[i%palette.length]),borderRadius:5,borderSkipped:false}]},
+    options:{
+      ...CHART_BASE,
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{label:c=>`Avg: ${c.raw}/100`,afterLabel:c=>`SKUs: ${counts[c.dataIndex]}`}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10},color:'#5C5750'},border:{display:false}},
+        y:{min:0,max:100,grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:10},color:'#A09C94'},border:{display:false}},
+      }
+    }
+  });
+}
 
-  function markAllSteps(state) { for (let i=0;i<8;i++) markStep(i,state); }
+/* 5 ── Field completeness radar */
+function renderRadarChart(){
+  const fields=[
+    {key:'product_name',label:'Name'},{key:'category',label:'Category'},
+    {key:'price_usd',label:'Price'},{key:'description',label:'Description'},
+    {key:'color',label:'Color'},{key:'material',label:'Material'},
+    {key:'dimensions',label:'Dims'},{key:'weight_kg',label:'Weight'},
+    {key:'brand',label:'Brand'},{key:'seo_tags',label:'SEO Tags'},
+  ];
+  const n=allProds.length||1;
+  const pcts=fields.map(f=>{
+    const filled=allProds.filter(p=>{
+      const v=p[f.key];
+      if(v==null||v===''||v===false)return false;
+      if(Array.isArray(v)&&v.length===0)return false;
+      return true;
+    }).length;
+    return Math.round(filled/n*100);
+  });
+  chartRadar=mkChart('chart-radar',{
+    type:'radar',
+    data:{
+      labels:fields.map(f=>f.label),
+      datasets:[{
+        label:'% Complete',data:pcts,
+        backgroundColor:'rgba(79,70,229,.12)',
+        borderColor:'#4F46E5',borderWidth:2,
+        pointBackgroundColor:'#4F46E5',pointRadius:3,pointHoverRadius:5,
+      }]
+    },
+    options:{
+      ...CHART_BASE,
+      plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>`${c.raw}% filled`}}},
+      scales:{r:{
+        min:0,max:100,
+        ticks:{font:{size:8},color:'#A09C94',stepSize:25,backdropColor:'transparent'},
+        grid:{color:'rgba(0,0,0,.07)'},
+        pointLabels:{font:{size:9},color:'#5C5750'},
+        angleLines:{color:'rgba(0,0,0,.07)'},
+      }}
+    }
+  });
+}
 
-  function setProgressVisible(v) {
-    document.getElementById('progress-section').classList.toggle('hidden', !v);
-  }
+/* 6 ── Before vs After enrichment — grouped bar */
+function renderBeforeAfterChart(){
+  const fields=[
+    {key:'price_usd',label:'Price'},{key:'description',label:'Desc'},
+    {key:'category',label:'Category'},{key:'color',label:'Color'},
+    {key:'material',label:'Material'},
+  ];
+  const n=allProds.length||1;
+  const before=fields.map(f=>Math.round(
+    allProds.filter(p=>{
+      const v=p[f.key];
+      if(v==null||v===''||v===false)return false;
+      if(Array.isArray(v)&&v.length===0)return false;
+      return !(p.flags||[]).some(fl=>fl.startsWith(`AUTO_FILLED:${f.key}`));
+    }).length/n*100
+  ));
+  const after=fields.map(f=>Math.round(
+    allProds.filter(p=>{
+      const v=p[f.key];
+      if(v==null||v===''||v===false)return false;
+      if(Array.isArray(v)&&v.length===0)return false;
+      return true;
+    }).length/n*100
+  ));
+  chartBeforeAfter=mkChart('chart-before-after',{
+    type:'bar',
+    data:{
+      labels:fields.map(f=>f.label),
+      datasets:[
+        {label:'Before',data:before,backgroundColor:'rgba(168,162,158,.45)',borderRadius:3,borderSkipped:false},
+        {label:'After', data:after, backgroundColor:'#4F46E5',borderRadius:3,borderSkipped:false},
+      ]
+    },
+    options:{
+      ...CHART_BASE,
+      plugins:{
+        legend:{position:'bottom',labels:{font:{size:10},boxWidth:10,padding:8}},
+        tooltip:{callbacks:{label:c=>`${c.dataset.label}: ${c.raw}%`}}
+      },
+      scales:{
+        x:{grid:{display:false},ticks:{font:{size:10},color:'#5C5750'},border:{display:false}},
+        y:{min:0,max:100,grid:{color:'rgba(0,0,0,.05)'},ticks:{font:{size:10},color:'#A09C94',callback:v=>v+'%'},border:{display:false}},
+      }
+    }
+  });
+}
 
-  function resetBtn() {
-    const btn = document.getElementById('run-btn');
-    btn.disabled = false;
-    btn.innerHTML = '▶&nbsp; Run Enrichment Pipeline';
-  }
+/* ── Enrichment summary ── */
+function renderEnrichSummary(d){
+  const prods=d.products||[];
+  const allFlags=prods.flatMap(p=>p.flags||[]);
+  const items=[
+    {icon:'🌐',label:'Non-English translated',val:allFlags.filter(f=>f.startsWith('original_language')).length},
+    {icon:'✏️',label:'Descriptions generated/enhanced',val:allFlags.filter(f=>f.includes('_by_llm')).length},
+    {icon:'🔧',label:'Fields auto-filled',val:allFlags.filter(f=>f.startsWith('AUTO_FILLED')).length},
+    {icon:'🔗',label:'Duplicates detected',val:allFlags.filter(f=>f.startsWith('duplicate_of')).length},
+    {icon:'⚠️',label:'Missing required fields',val:allFlags.filter(f=>f.startsWith('MISSING:')).length},
+    {icon:'🏷️',label:'SEO tags generated',val:prods.filter(p=>p.seo_tags&&p.seo_tags.length).length},
+  ];
+  document.getElementById('enrich-summary').innerHTML=items.map(i=>
+    `<div style="display:flex;align-items:center;gap:7px;padding:7px 10px;background:var(--surface);border-radius:7px;border:1px solid var(--border)">
+      <span style="font-size:15px">${i.icon}</span>
+      <span style="flex:1;color:var(--text2)">${i.label}</span>
+      <strong style="color:var(--text)">${i.val}</strong>
+    </div>`
+  ).join('');
+}
 
-  /* ── Results ────────────────────────────────────────────────────────── */
-  async function loadResults(jobId) {
-    const d = await apiFetch(`/api/results/${jobId}?limit=2000`);
-    allProducts = d.products || [];
-    pageOffset  = 0;
+/* ── Products tab ── */
+function populateCatFilter(){
+  const cats=[...new Set(allProds.map(p=>p.category||'Unknown'))].sort();
+  const sel=document.getElementById('cat-filter');
+  sel.innerHTML='<option value="">All categories</option>'+cats.map(c=>`<option value="${esc(c)}">${esc(c)}</option>`).join('');
+}
 
-    document.getElementById('empty-state').classList.add('hidden');
-    document.getElementById('results-content').classList.remove('hidden');
+function filterProducts(){
+  const q=document.getElementById('search').value.toLowerCase();
+  const cat=document.getElementById('cat-filter').value;
+  const sc=document.getElementById('score-filter').value;
+  filteredProds=allProds.filter(p=>{
+    const nameMatch=!q||(p.product_name||'').toLowerCase().includes(q)||(p.sku||'').toLowerCase().includes(q);
+    const catMatch=!cat||p.category===cat;
+    const s=p.quality_score||0;
+    const scMatch=!sc||(sc==='high'&&s>=80)||(sc==='mid'&&s>=50&&s<80)||(sc==='low'&&s<50);
+    return nameMatch&&catMatch&&scMatch;
+  });
+  offset=0;renderTable();
+}
 
-    renderStats(d);
-    renderDlBtns(jobId);
-    renderTable();
-    document.getElementById('report-text').textContent = d.report || '';
-    loadReviewQueue(jobId);
-  }
+function renderTable(){
+  const page=filteredProds.slice(offset,offset+PAGE);
+  document.getElementById('tbl-body').innerHTML=page.map(p=>{
+    const s=p.quality_score||0;
+    const sc=s>=80?'sc-hi fill-hi':s>=50?'sc-mid fill-mid':'sc-lo fill-lo';
+    const [scN,scF]=sc.split(' ');
+    const issues=(p.flags||[]).filter(f=>f.startsWith('MISSING')||f.startsWith('UNRESOLVED')||f.startsWith('HIGH_MISSING'));
+    const desc=(p.description||'').slice(0,100);
+    return`<tr>
+      <td><span class="sku">${esc(p.sku||'')}</span></td>
+      <td style="font-weight:500;max-width:150px;word-break:break-word">${esc(p.product_name||'—')}</td>
+      <td><span class="cat">${esc(p.category||'—')}</span></td>
+      <td style="font-weight:600">${p.price_usd!=null?'$'+Number(p.price_usd).toFixed(2):'<span style="color:var(--text3)">—</span>'}</td>
+      <td>
+        <span class="sc-num ${scN}">${s}</span>
+        <div class="sc-bar"><div class="sc-fill ${scF}" style="width:${s}%"></div></div>
+        ${p.needs_human_review?'<span class="review-pill">⚠ Review</span>':''}
+      </td>
+      <td><span class="desc-clip" title="${esc(p.description||'')}">${esc(desc)}${desc.length<(p.description||'').length?'…':''}</span></td>
+      <td>${issues.length?issues.slice(0,2).map(f=>`<div class="flag-w">⚠ ${esc(f.replace(/^(MISSING|UNRESOLVED_REQUIRED|HIGH_MISSING_RATIO):?/,''))}</div>`).join(''):'<span class="flag-ok">✓</span>'}</td>
+    </tr>`;
+  }).join('');
 
-  /* ── Stats tiles ────────────────────────────────────────────────────── */
-  function renderStats(d) {
-    const prods = d.products || [];
-    const scores = prods.map(p => p.quality_score || 0);
-    const avg = scores.length ? +(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : 0;
-    const dups    = prods.filter(p => p.is_duplicate).length;
-    const review  = prods.filter(p => p.needs_human_review).length;
-    const hi      = prods.filter(p => (p.quality_score||0) >= 80).length;
-    const tiles = [
-      { val: d.total_skus,   lbl: 'Total SKUs',   cls: '' },
-      { val: avg,             lbl: 'Avg Score',    cls: 'indigo' },
-      { val: hi,              lbl: 'Score ≥ 80',   cls: 'teal' },
-      { val: dups,            lbl: 'Duplicates',   cls: dups ? 'amber' : '' },
-      { val: review,          lbl: 'Need Review',  cls: review ? 'rose' : '' },
-    ];
-    document.getElementById('stats-row').innerHTML = tiles.map(t =>
-      `<div class="stat-tile">
-        <div class="st-val ${t.cls}">${t.val}</div>
-        <div class="st-lbl">${t.lbl}</div>
-      </div>`
-    ).join('');
-  }
+  const total=filteredProds.length,pages=Math.ceil(total/PAGE),cur=Math.floor(offset/PAGE)+1;
+  document.getElementById('pagination').innerHTML=`
+    <span>${offset+1}–${Math.min(offset+PAGE,total)} of ${total} products</span>
+    <div class="pg-btns">
+      <button class="btn btn-outline btn-sm" ${cur===1?'disabled':''} onclick="goPage(${cur-2})">← Prev</button>
+      <span style="padding:0 8px;color:var(--text2)">${cur} / ${Math.max(pages,1)}</span>
+      <button class="btn btn-outline btn-sm" ${cur===pages||pages===0?'disabled':''} onclick="goPage(${cur})">Next →</button>
+    </div>`;
+}
+function goPage(p){offset=p*PAGE;renderTable()}
 
-  function renderDlBtns(jobId) {
-    document.getElementById('dl-btns').innerHTML = `
-      <a href="/api/results/${jobId}/download/json" download>
-        <button class="btn btn-outline btn-sm">↓ JSON</button>
-      </a>
-      <a href="/api/results/${jobId}/download/csv" download>
-        <button class="btn btn-outline btn-sm">↓ CSV</button>
-      </a>`;
-  }
+/* ── Tabs ── */
+function tab(t){
+  const tabs=['overview','products','review','report'];
+  document.querySelectorAll('.tab').forEach((el,i)=>el.classList.toggle('on',tabs[i]===t));
+  tabs.forEach(id=>document.getElementById('tab-'+id).classList.toggle('hidden',id!==t));
+}
 
-  /* ── Table ──────────────────────────────────────────────────────────── */
-  function renderTable() {
-    const page = allProducts.slice(pageOffset, pageOffset + PAGE_SIZE);
-    document.getElementById('products-body').innerHTML = page.map(p => {
-      const sc = p.quality_score || 0;
-      const scCls = sc >= 80 ? 'score-high fill-high' : sc >= 50 ? 'score-mid fill-mid' : 'score-low fill-low';
-      const [scNum, scFill] = scCls.split(' ');
-      const issues = (p.flags||[]).filter(f =>
-        f.startsWith('MISSING') || f.startsWith('UNRESOLVED') || f.startsWith('HUMAN')
-      );
-      const desc = (p.description || '').slice(0, 100);
-      return `<tr>
-        <td><span class="sku-code">${esc(p.sku||'')}</span></td>
-        <td style="font-weight:500;max-width:160px;word-break:break-word">${esc(p.product_name||'—')}</td>
-        <td><span class="cat-badge">${esc(p.category||'—')}</span></td>
-        <td class="price-cell">${p.price_usd != null ? '$'+Number(p.price_usd).toFixed(2) : '<span style="color:var(--text3)">—</span>'}</td>
-        <td class="score-cell">
-          <span class="score-num ${scNum}">${sc}</span>
-          <div class="score-bar"><div class="score-bar-fill ${scFill}" style="width:${sc}%"></div></div>
-          ${p.needs_human_review ? '<span class="review-badge">⚠ Review</span>' : ''}
-        </td>
-        <td><span class="desc-text" title="${esc(p.description||'')}">${esc(desc)}${desc.length < (p.description||'').length ? '…' : ''}</span></td>
-        <td>
-          ${issues.length
-            ? issues.slice(0,2).map(f => `<div class="flag-warn">⚠ ${esc(f.replace(/^(MISSING|UNRESOLVED_REQUIRED|HUMAN_REVIEW_REQUIRED):?/,''))}</div>`).join('')
-            : '<span class="flag-ok">✓</span>'}
-        </td>
-      </tr>`;
-    }).join('');
-
-    const total = allProducts.length;
-    const pages = Math.ceil(total / PAGE_SIZE);
-    const cur   = Math.floor(pageOffset / PAGE_SIZE) + 1;
-    document.getElementById('pagination').innerHTML = `
-      <span class="pg-info">Showing ${pageOffset+1}–${Math.min(pageOffset+PAGE_SIZE,total)} of ${total} products</span>
-      <div class="pg-btns">
-        <button class="btn btn-outline btn-sm" ${cur===1?'disabled':''} onclick="goPage(${cur-2})">← Prev</button>
-        <span style="padding:0 8px;color:var(--text2)">${cur} / ${pages}</span>
-        <button class="btn btn-outline btn-sm" ${cur===pages?'disabled':''} onclick="goPage(${cur})">Next →</button>
+/* ── Human review ── */
+let rvJobId=null;
+async function loadReviewQueue(id){
+  rvJobId=id;
+  try{
+    const d=await get('/api/review/'+id);
+    const badge=document.getElementById('rv-badge');
+    const empty=document.getElementById('rv-empty');
+    const list=document.getElementById('rv-list');
+    if(!d.products||!d.products.length){badge.innerHTML='';empty.classList.remove('hidden');list.classList.add('hidden');return}
+    badge.innerHTML=`<span class="rv-badge">${d.products.length}</span>`;
+    empty.classList.add('hidden');list.classList.remove('hidden');
+    list.innerHTML=d.products.map(p=>{
+      const issues=(p.flags||[]).filter(f=>f.startsWith('MISSING')||f.startsWith('UNRESOLVED')||f.startsWith('HIGH_MISSING'));
+      return`<div class="rv-card" id="rv-${esc(p.sku)}">
+        <div class="rv-hd">
+          <div><span class="sku">${esc(p.sku)}</span><span style="font-weight:600;font-size:13px;margin-left:9px">${esc(p.product_name||'—')}</span></div>
+          <div style="display:flex;align-items:center;gap:7px">
+            <span style="font-size:13px;font-weight:700;color:var(--rose)">${p.quality_score}/100</span>
+            <span class="cat">${esc(p.category||'Unknown')}</span>
+          </div>
+        </div>
+        <div class="rv-meta">
+          ${p.price_usd!=null?`<span>💰 $${Number(p.price_usd).toFixed(2)}</span>`:'<span style="color:var(--amber)">💰 Price missing</span>'}
+          ${p.color?`<span>🎨 ${esc(p.color)}</span>`:''}
+          ${p.material?`<span>🧱 ${esc(p.material)}</span>`:''}
+          ${p.supplier_id?`<span>🏭 ${esc(p.supplier_id)}</span>`:''}
+        </div>
+        <div class="rv-desc">${esc((p.description||'No description.').slice(0,200))}…</div>
+        ${issues.length?`<div style="margin-bottom:9px">${issues.map(f=>`<span class="rv-flag">⚠ ${esc(f)}</span>`).join('')}</div>`:''}
+        <div class="rv-actions">
+          <input class="rv-note" id="rn-${esc(p.sku)}" placeholder="Optional note for audit trail…"/>
+          <button class="btn btn-sm btn-approve" onclick="doReview('${esc(p.sku)}','approve')">✓ Approve</button>
+          <button class="btn btn-sm btn-reject"  onclick="doReview('${esc(p.sku)}','reject')">✕ Reject</button>
+        </div>
       </div>`;
-  }
+    }).join('');
+  }catch(e){console.error(e)}
+}
 
-  function goPage(p) { pageOffset = p * PAGE_SIZE; renderTable(); }
-
-  /* ── Tab switching ──────────────────────────────────────────────────── */
-  function switchTab(tab) {
-    document.querySelectorAll('.tab-item').forEach((el, i) => {
-      const tabs = ['products','report','review'];
-      el.classList.toggle('active', tabs[i] === tab);
-    });
-    document.getElementById('tab-products').classList.toggle('hidden', tab !== 'products');
-    document.getElementById('tab-report').classList.toggle('hidden', tab !== 'report');
-    document.getElementById('tab-review').classList.toggle('hidden', tab !== 'review');
-  }
-
-  /* ── Human Review ───────────────────────────────────────────────────── */
-  let reviewJobId = null;
-
-  async function loadReviewQueue(jobId) {
-    reviewJobId = jobId;
-    try {
-      const d = await apiFetch(`/api/review/${jobId}`);
-      const badge = document.getElementById('review-count-badge');
-      const emptyEl = document.getElementById('review-empty');
-      const listEl  = document.getElementById('review-list');
-
-      if (!d.products || d.products.length === 0) {
-        badge.innerHTML = '';
-        emptyEl.classList.remove('hidden');
-        listEl.classList.add('hidden');
-        return;
-      }
-
-      badge.innerHTML = `<span class="review-count-badge">${d.products.length}</span>`;
-      emptyEl.classList.add('hidden');
-      listEl.classList.remove('hidden');
-
-      listEl.innerHTML = d.products.map(p => {
-        const issues = (p.flags||[]).filter(f =>
-          f.startsWith('MISSING') || f.startsWith('UNRESOLVED') || f.startsWith('HIGH_MISSING')
-        );
-        return `
-          <div class="review-card" id="rc-${esc(p.sku)}">
-            <div class="review-card-header">
-              <div>
-                <span class="sku-code">${esc(p.sku)}</span>
-                <span class="review-card-title" style="margin-left:10px">${esc(p.product_name||'—')}</span>
-              </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <span style="font-size:13px;font-weight:700;color:var(--rose)">${p.quality_score}/100</span>
-                <span class="cat-badge">${esc(p.category||'Unknown')}</span>
-              </div>
-            </div>
-            <div class="review-card-meta">
-              ${p.price_usd != null ? `<span>💰 $${Number(p.price_usd).toFixed(2)}</span>` : '<span style="color:var(--amber)">💰 Price missing</span>'}
-              ${p.color ? `<span>🎨 ${esc(p.color)}</span>` : ''}
-              ${p.material ? `<span>🧱 ${esc(p.material)}</span>` : ''}
-              ${p.supplier_id ? `<span>🏭 ${esc(p.supplier_id)}</span>` : ''}
-            </div>
-            <div class="review-card-desc">${esc((p.description||'No description available.').slice(0,200))}…</div>
-            ${issues.length ? `<div class="review-card-flags">${issues.map(f=>`<span class="review-flag">⚠ ${esc(f)}</span>`).join('')}</div>` : ''}
-            <div class="review-actions">
-              <input class="review-note" id="note-${esc(p.sku)}" placeholder="Optional note…" />
-              <button class="btn btn-sm btn-approve" onclick="submitReview('${esc(p.sku)}','approve')">✓ Approve</button>
-              <button class="btn btn-sm btn-reject"  onclick="submitReview('${esc(p.sku)}','reject')">✕ Reject</button>
-            </div>
-          </div>`;
-      }).join('');
-    } catch(e) {
-      console.error('Review queue load failed', e);
+async function doReview(sku,action){
+  if(!rvJobId)return;
+  const note=document.getElementById('rn-'+sku)?.value||null;
+  try{
+    await post(`/api/review/${rvJobId}/${sku}`,{action,note});
+    const card=document.getElementById('rv-'+sku);
+    if(card){
+      card.classList.add(action==='approve'?'approved':'rejected');
+      card.querySelector('.rv-actions').innerHTML=`<span style="font-size:12px;color:var(--text3)">${action==='approve'?'✓ Approved':'✕ Rejected'}${note?' — '+esc(note):''}</span>`;
     }
-  }
+    toast('ok',`SKU ${sku} ${action}d`);
+  }catch(e){toast('err','Review failed: '+e.message)}
+}
 
-  async function submitReview(sku, action) {
-    if (!reviewJobId) return;
-    const note = document.getElementById(`note-${sku}`)?.value || null;
-    try {
-      await apiFetch(`/api/review/${reviewJobId}/${sku}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action, note }),
-      });
-      const card = document.getElementById(`rc-${sku}`);
-      if (card) {
-        card.classList.add(action === 'approve' ? 'approved' : 'rejected');
-        card.querySelector('.review-actions').innerHTML =
-          `<span style="font-size:12px;color:var(--text3)">${action === 'approve' ? '✓ Approved' : '✕ Rejected'}${note ? ` — ${esc(note)}` : ''}</span>`;
-      }
-      toast('success', `SKU ${sku} ${action}d`);
-    } catch(e) {
-      toast('error', `Review failed: ${e.message}`);
-    }
-  }
+/* ── Job list ── */
+async function refreshJobs(){
+  try{
+    const d=await get('/api/jobs');
+    const el=document.getElementById('job-list');
+    if(!d.jobs.length){el.innerHTML='<p style="font-size:12px;color:var(--text3)">No jobs yet.</p>';return}
+    el.innerHTML=d.jobs.slice(0,6).map(j=>`
+      <div class="job-item">
+        <span class="sb sb-${j.status}">${j.status}</span>
+        <span class="ji-id">${j.job_id}</span>
+        <span class="ji-meta">${j.total_skus!=null?j.total_skus+' SKUs':''}${j.avg_quality_score!=null?' · avg '+j.avg_quality_score:''}</span>
+        ${j.status==='complete'?`<button class="btn btn-ghost btn-sm" onclick="loadResults('${j.job_id}')">View</button>`:''}
+      </div>`).join('');
+  }catch{}
+}
 
-  /* ── Job list ───────────────────────────────────────────────────────── */
-  async function refreshJobList() {
-    try {
-      const d = await apiFetch('/api/jobs');
-      const el = document.getElementById('job-list');
-      if (!d.jobs.length) { el.innerHTML = '<p style="font-size:12px;color:var(--text3)">No jobs yet.</p>'; return; }
-      el.innerHTML = d.jobs.slice(0,6).map(j => `
-        <div class="job-item">
-          <span class="sbadge sb-${j.status}">${j.status}</span>
-          <span class="ji-id">${j.job_id}</span>
-          <span class="ji-meta">
-            ${j.total_skus != null ? j.total_skus+' SKUs' : ''}
-            ${j.avg_quality_score != null ? '· avg '+j.avg_quality_score : ''}
-          </span>
-          ${j.status==='complete'
-            ? `<button class="btn btn-ghost btn-sm" onclick="loadResults('${j.job_id}')">View</button>`
-            : ''}
-        </div>`).join('');
-    } catch(e) {}
-  }
+/* ── Toasts ── */
+function toast(type,msg){
+  const icons={ok:'✓',err:'✕',info:'ℹ'};
+  const el=document.createElement('div');
+  el.className=`toast t-${type}`;
+  el.innerHTML=`<span>${icons[type]||''}</span>${esc(msg)}`;
+  document.getElementById('toasts').appendChild(el);
+  setTimeout(()=>el.style.opacity='0',3200);
+  setTimeout(()=>el.remove(),3600);
+}
 
-  /* ── Toast ──────────────────────────────────────────────────────────── */
-  function toast(type, msg) {
-    const icons = { success:'✓', error:'✕', info:'ℹ' };
-    const el = document.createElement('div');
-    el.className = `toast t-${type}`;
-    el.innerHTML = `<span>${icons[type]||''}</span> ${esc(msg)}`;
-    document.getElementById('toasts').appendChild(el);
-    setTimeout(() => el.style.opacity='0', 3200);
-    setTimeout(() => el.remove(), 3600);
-  }
+/* ── HTTP helpers ── */
+async function get(url){const r=await fetch(API+url);if(!r.ok)throw new Error(await r.text());return r.json()}
+async function post(url,body){const r=await fetch(API+url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});if(!r.ok)throw new Error(await r.text());return r.json()}
 
-  /* ── API helper ─────────────────────────────────────────────────────── */
-  async function apiFetch(url, opts={}) {
-    const r = await fetch(API + url, opts);
-    if (!r.ok) { const t = await r.text(); throw new Error(t); }
-    return r.json();
-  }
+/* ── Escape ── */
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;')}
 
-  /* ── Utils ──────────────────────────────────────────────────────────── */
-  function esc(s) {
-    return String(s)
-      .replace(/&/g,'&amp;').replace(/</g,'&lt;')
-      .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  }
+/* ── Init ── */
+checkHealth();refreshJobs();
+setInterval(checkHealth,30000);setInterval(refreshJobs,5000);
 
-  /* ── Boot ───────────────────────────────────────────────────────────── */
-  checkHealth();
-  refreshJobList();
-  setInterval(checkHealth, 30000);
-  setInterval(refreshJobList, 5000);
+/* ── Keyboard shortcuts ── */
+document.addEventListener('keydown',e=>{
+  // Cmd/Ctrl + Enter → run pipeline
+  if((e.metaKey||e.ctrlKey)&&e.key==='Enter'){
+    e.preventDefault();
+    const btn=document.getElementById('run-btn');
+    if(!btn.disabled)runPipeline();
+  }
+  // Escape → cancel SSE / polling
+  if(e.key==='Escape'){
+    if(_sse){_sse.close();_sse=null}
+    if(poll){clearInterval(poll);poll=null}
+  }
+  // 1/2/3/4 → switch tabs when results visible
+  if(!document.getElementById('results').classList.contains('hidden')){
+    const map={'1':'overview','2':'products','3':'review','4':'report'};
+    if(map[e.key])tab(map[e.key]);
+  }
+});
 </script>
 </body>
 </html>
