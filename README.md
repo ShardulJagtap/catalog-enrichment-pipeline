@@ -1,5 +1,7 @@
 # Agentic AI Pipeline for Product Catalog Enrichment
 
+![Pipeline Demo](docs/demo.gif)
+
 An end-to-end multi-agent pipeline that ingests raw product feeds from multiple suppliers, normalises and deduplicates them, maps them to a master schema, fills gaps with a local LLM, generates SEO-optimised descriptions, and scores each SKU for quality — all locally, with no cloud API dependencies.
 
 ---
