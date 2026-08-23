@@ -1,0 +1,9 @@
+sku,name,price,color,category,description
+A001,"Wireless BT Headphone",49.99,blk,electronics,""
+A002,"USB-C Fast Charger 65W",,white,,"charges fast"
+A003,"4K OLED Monitor 27inch",399,,displays,""
+A004,"Mechanical Gaming Keyboard",89.99,rgb,electronics,"Tactile switches, customizable backlight"
+A005,"Noise Cancelling Earbuds",129.00,wht,electronics,""
+A006,"Portable SSD 1TB",79.99,blk,electronics,"Fast transfer speeds"
+A007,"Wireless Mouse Ergonomic",34.99,gry,electronics,""
+A008,"27in Gaming Monitor 144Hz",349.99,,displays,"IPS panel smooth gameplay"

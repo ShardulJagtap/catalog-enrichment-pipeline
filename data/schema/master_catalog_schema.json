@@ -1,0 +1,30 @@
+{
+  "title": "MasterCatalogSchema",
+  "description": "Standardized product catalog schema for enriched SKUs",
+  "type": "object",
+  "required_fields": ["sku", "product_name", "category", "price_usd", "description", "supplier_id", "quality_score", "flags"],
+  "properties": {
+    "sku": {"type": "string", "description": "Unique Stock Keeping Unit identifier", "required": true},
+    "product_name": {"type": "string", "description": "Clean, standardized product name", "required": true, "minLength": 3},
+    "category": {"type": "string", "description": "Top-level product category from standard taxonomy", "required": true, "enum": ["Electronics", "Apparel", "Home & Kitchen", "Sports & Outdoors", "Health & Beauty", "Toys & Games", "Books & Media", "Automotive", "Garden & Outdoor", "Office Supplies", "Unknown"]},
+    "subcategory": {"type": "string", "description": "Second-level category for finer classification", "required": false},
+    "price_usd": {"type": "number", "description": "Product price in US Dollars", "required": true, "minimum": 0},
+    "currency": {"type": "string", "description": "Currency code ISO 4217", "required": false, "default": "USD"},
+    "color": {"type": "string", "description": "Standardized color name in English", "required": false},
+    "size": {"type": "string", "description": "Product size clothing size dimensions label etc", "required": false},
+    "material": {"type": "string", "description": "Primary material composition", "required": false},
+    "dimensions": {"type": "string", "description": "Physical dimensions LxWxH or relevant measure", "required": false},
+    "weight_kg": {"type": "number", "description": "Weight in kilograms", "required": false, "minimum": 0},
+    "brand": {"type": "string", "description": "Manufacturer or brand name", "required": false},
+    "description": {"type": "string", "description": "Rich SEO-optimized product description min 50 words", "required": true},
+    "seo_tags": {"type": "array", "description": "List of SEO keyword tags for search optimization", "required": false},
+    "supplier_id": {"type": "string", "description": "Identifier of the originating supplier", "required": true},
+    "supplier_sku": {"type": "string", "description": "Original SKU as provided by the supplier", "required": false},
+    "is_duplicate": {"type": "boolean", "description": "Whether this product was flagged as a duplicate", "default": false},
+    "duplicate_of": {"type": "string", "description": "SKU of the canonical product if this is a duplicate", "required": false},
+    "language_detected": {"type": "string", "description": "ISO 639-1 language code detected in original listing", "required": false},
+    "quality_score": {"type": "integer", "description": "Completeness and confidence score from 0 to 100", "required": true, "minimum": 0, "maximum": 100},
+    "flags": {"type": "array", "description": "List of issues warnings or agent decisions for auditability", "required": true},
+    "needs_human_review": {"type": "boolean", "description": "True if quality_score < 50 requires human-in-the-loop review", "default": false}
+  }
+}

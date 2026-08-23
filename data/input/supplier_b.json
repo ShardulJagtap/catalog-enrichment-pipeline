@@ -1,0 +1,47 @@
+[
+  {
+    "id": "B-991",
+    "title": "Men's Slim Fit Jeans",
+    "clr": "indigo",
+    "sz": "32x30",
+    "material": null,
+    "cost": "29.95",
+    "desc": null
+  },
+  {
+    "id": "B-992",
+    "title": "Women Hoodie Fleece",
+    "clr": "grey",
+    "sz": "M",
+    "material": "polyester blend",
+    "cost": null,
+    "desc": "Warm and cozy"
+  },
+  {
+    "id": "B-993",
+    "title": "Running Shoes Men Size 10",
+    "clr": "blau",
+    "sz": "10",
+    "material": "mesh upper",
+    "cost": "59.99",
+    "desc": "Leicht und atmungsaktiv"
+  },
+  {
+    "id": "B-994",
+    "title": "Women's Yoga Pants",
+    "clr": "black",
+    "sz": "S",
+    "material": "nylon spandex",
+    "cost": "34.99",
+    "desc": "High waist, 4-way stretch"
+  },
+  {
+    "id": "B-995",
+    "title": "Slim Fit Jeans Men Indigo 32x30",
+    "clr": "indigo",
+    "sz": "32x30",
+    "material": "denim cotton",
+    "cost": "32.00",
+    "desc": "Classic slim fit denim"
+  }
+]
