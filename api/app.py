@@ -382,6 +382,51 @@ async def upload_file(file: UploadFile = File(...)):
     return {"filename": file.filename, "size_bytes": len(content), "path": str(dest)}
 
 
+# ── Streaming ingestion ────────────────────────────────────────────────────────
+
+@app.post("/api/stream/ingest")
+async def stream_ingest(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
+    """
+    Bonus: Streaming ingestion — upload a single supplier file and immediately
+    trigger enrichment for just that file, without waiting to batch with others.
+
+    This implements the streaming ingestion bonus requirement:
+    products are processed as they arrive, not in batch.
+    """
+    allowed = {".csv", ".json", ".txt", ".xml"}
+    ext = Path(file.filename).suffix.lower()
+    if ext not in allowed:
+        raise HTTPException(status_code=400, detail=f"Unsupported file type. Allowed: {allowed}")
+
+    # Save the file
+    dest = DATA_INPUT_DIR / file.filename
+    content = await file.read()
+    dest.write_bytes(content)
+    logger.info("Stream ingest: received %s (%d bytes)", file.filename, len(content))
+
+    # Immediately trigger pipeline for this single file
+    job_id = str(uuid.uuid4())[:8]
+    with _jobs_lock:
+        _jobs[job_id] = {
+            "job_id": job_id, "status": "queued",
+            "started_at": None, "completed_at": None,
+            "progress": f"Stream ingest: {file.filename}",
+            "total_skus": None, "avg_quality_score": None,
+            "error": None, "json_path": None, "csv_path": None,
+            "report_path": None, "report_text": None, "enriched": None,
+        }
+
+    background_tasks.add_task(_run_pipeline, job_id, [str(dest)], False)
+    logger.info("Stream job %s queued for file: %s", job_id, file.filename)
+
+    return {
+        "message": "File received and enrichment started immediately (streaming mode)",
+        "filename": file.filename,
+        "job_id": job_id,
+        "poll_url": f"/api/status/{job_id}",
+    }
+
+
 # ── Human-in-the-loop review ──────────────────────────────────────────────────
 
 class ReviewAction(BaseModel):
