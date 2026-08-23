@@ -123,10 +123,10 @@ def test_duplicate_product_scores_lower(agent):
 # ── Description quality ────────────────────────────────────────────────────────
 
 def test_short_description_reduces_score(agent):
-    p_short = make_product(description="")          # no description at all
+    p_short = make_product(description="")          # zero words — no description credit
     p_long  = make_product(
         description="This product is excellent for daily use and delivers outstanding quality. " * 4,
-        sku="TEST-002"
+        sku="TEST-002",
     )
     results = agent.execute([p_short, p_long])
     assert results[1].quality_score > results[0].quality_score
